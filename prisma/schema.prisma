@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+// ─── Users & Auth ────────────────────────────────────────────
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         String    @default("tech") // admin | manager | tech
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  projects     Project[] @relation("AssignedUser")
+  timeEntries  TimeEntry[]
+
+  @@map("users")
+}
+
+// ─── CRM / Contacts ─────────────────────────────────────────
+model Contact {
+  id        String    @id @default(uuid())
+  name      String
+  phone     String
+  email     String
+  source    String    @default("other")
+  status    String    @default("new")
+  notes     String    @default("")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  projects  Project[]
+
+  @@map("contacts")
+}
+
+// ─── Projects (10-Stage Workflow) ────────────────────────────
+model Project {
+  id             String    @id @default(uuid())
+  contactId      String    @map("contact_id")
+  jobType        String    @map("job_type")
+  address        String    @default("")
+  scope          String    @default("")
+  value          Float?
+  stage          String    @default("S1")
+  assignedUserId String?   @map("assigned_user_id")
+  startDate      DateTime? @map("start_date")
+  endDate        DateTime? @map("end_date")
+  notes          String    @default("")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  contact        Contact        @relation(fields: [contactId], references: [id])
+  assignedUser   User?          @relation("AssignedUser", fields: [assignedUserId], references: [id])
+  tasks          Task[]
+  files          File[]
+  changeOrders   ChangeOrder[]
+  purchaseOrders PurchaseOrder[]
+  timeEntries    TimeEntry[]
+  documents      Document[]
+  stageHistory   StageHistory[]
+
+  @@map("projects")
+}
+
+// ─── Tasks (Exit Checklists & Custom Tasks) ──────────────────
+model Task {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  label       String
+  completed   Boolean  @default(false)
+  isChecklist Boolean  @default(false) @map("is_checklist")
+  stage       String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}
+
+// ─── Files ───────────────────────────────────────────────────
+model File {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  filename   String
+  url        String
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("files")
+}
+
+// ─── Documents ───────────────────────────────────────────────
+model Document {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  type       String
+  label      String
+  url        String
+  stage      String?
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+// ─── Change Orders ───────────────────────────────────────────
+model ChangeOrder {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  description String
+  amount      Float
+  status      String   @default("pending")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("change_orders")
+}
+
+// ─── Purchase Orders ─────────────────────────────────────────
+model PurchaseOrder {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  vendor      String
+  description String
+  amount      Float
+  status      String   @default("pending")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_orders")
+}
+
+// ─── Time Entries ────────────────────────────────────────────
+model TimeEntry {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  userId    String   @map("user_id")
+  date      DateTime @db.Date
+  hours     Float
+  note      String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("time_entries")
+}
+
+// ─── Stage History ───────────────────────────────────────────
+model StageHistory {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  fromStage String   @map("from_stage")
+  toStage   String   @map("to_stage")
+  movedAt   DateTime @default(now()) @map("moved_at")
+  movedBy   String?  @map("moved_by")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("stage_history")
+}
