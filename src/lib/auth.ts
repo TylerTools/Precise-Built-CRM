@@ -3,7 +3,12 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET environment variable is required. Set it in your .env or Vercel project settings."
+  );
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export interface JWTPayload {
   userId: string;

@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
+import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-import { getSession } from "@/lib/auth";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -24,21 +22,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const ext = path.extname(file.name);
-  const filename = `${uuidv4()}${ext}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-
-  await mkdir(uploadDir, { recursive: true });
-
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  await writeFile(path.join(uploadDir, filename), buffer);
-
-  // For dev: local path. In prod: swap to cloud storage URL
-  const url = `/uploads/${filename}`;
+  const blob = await put(file.name, file, {
+    access: "public",
+  });
 
   const dbFile = await prisma.file.create({
-    data: { projectId, filename: file.name, url },
+    data: { projectId, filename: file.name, url: blob.url },
   });
 
   return NextResponse.json(dbFile, { status: 201 });
