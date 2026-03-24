@@ -4,8 +4,7 @@
 
 @layer base {
   body {
-    @apply font-syne text-zinc-100 antialiased;
-    background-color: #0e0e0f;
+    @apply font-syne text-zinc-100 bg-surface antialiased;
   }
 }
 

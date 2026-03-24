@@ -4,6 +4,37 @@ import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const completedParam = searchParams.get("completed");
+
+  const where: Record<string, unknown> = {};
+  if (completedParam !== null) {
+    where.completed = completedParam === "true";
+  }
+
+  const tasks = await prisma.task.findMany({
+    where,
+    include: {
+      project: {
+        select: {
+          id: true,
+          jobType: true,
+          contact: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return NextResponse.json(tasks);
+}
+
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {

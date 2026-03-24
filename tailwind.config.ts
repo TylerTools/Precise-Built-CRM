@@ -9,6 +9,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        surface: {
+          DEFAULT: "#0e0e0f",
+          raised: "#161617",
+          overlay: "#1c1c1e",
+        },
         brand: {
           50: "#fdf8f6",
           100: "#f9ede7",

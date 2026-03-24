@@ -9,15 +9,10 @@ interface Props {
 }
 
 const JOB_TYPES = [
-  "Kitchen Remodel",
   "Bathroom Remodel",
-  "Full Home Renovation",
+  "Kitchen Remodel",
+  "Full Renovation",
   "Addition",
-  "Deck / Patio",
-  "Flooring",
-  "Painting",
-  "Roofing",
-  "Custom Build",
   "Other",
 ];
 
@@ -27,11 +22,12 @@ export default function NewLeadModal({ open, onClose }: Props) {
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     phone: "",
     email: "",
     address: "",
-    jobType: "Kitchen Remodel",
+    jobType: "Bathroom Remodel",
     value: "",
     notes: "",
   });
@@ -41,10 +37,11 @@ export default function NewLeadModal({ open, onClose }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.phone.trim()) {
-      setError("Client name and phone are required.");
+    if (!form.firstName.trim() || !form.phone.trim()) {
+      setError("First name and phone are required.");
       return;
     }
+    const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`.trim();
 
     setSubmitting(true);
     setError("");
@@ -55,12 +52,12 @@ export default function NewLeadModal({ open, onClose }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name.trim(),
+          name: fullName,
           phone: form.phone.trim(),
           email: form.email.trim(),
           source: "manual",
           status: "new",
-          notes: "",
+          notes: form.notes.trim(),
         }),
       });
 
@@ -92,7 +89,7 @@ export default function NewLeadModal({ open, onClose }: Props) {
       const project = await projectRes.json();
 
       // Reset form & navigate
-      setForm({ name: "", phone: "", email: "", address: "", jobType: "Kitchen Remodel", value: "", notes: "" });
+      setForm({ firstName: "", lastName: "", phone: "", email: "", address: "", jobType: "Bathroom Remodel", value: "", notes: "" });
       onClose();
       router.push(`/projects/${project.id}`);
     } catch (err: unknown) {
@@ -136,18 +133,32 @@ export default function NewLeadModal({ open, onClose }: Props) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Client Name */}
-          <div>
-            <label className="block text-xs font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
-              Client Name *
-            </label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => set("name", e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500"
-              placeholder="John Smith"
-            />
+          {/* First + Last Name row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+                First Name *
+              </label>
+              <input
+                type="text"
+                value={form.firstName}
+                onChange={(e) => set("firstName", e.target.value)}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500"
+                placeholder="John"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+                Last Name
+              </label>
+              <input
+                type="text"
+                value={form.lastName}
+                onChange={(e) => set("lastName", e.target.value)}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500"
+                placeholder="Smith"
+              />
+            </div>
           </div>
 
           {/* Phone + Email row */}
