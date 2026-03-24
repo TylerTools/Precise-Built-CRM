@@ -510,108 +510,10 @@ export default function ProjectDetailPage() {
           )}
 
           {activeTab === "financials" && (
-            <>
-              {/* Change Orders */}
-              <Card title="Change Orders">
-                {(project.changeOrders || []).length === 0 ? (
-                  <p className="text-sm text-zinc-600 py-2">
-                    No change orders yet.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {project.changeOrders.map((co) => (
-                      <div
-                        key={co.id}
-                        className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3"
-                      >
-                        <div>
-                          <p className="text-sm text-zinc-300">
-                            {co.description}
-                          </p>
-                          <p className="text-xs text-zinc-600 font-mono">
-                            {co.status} ·{" "}
-                            {new Date(co.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <span
-                          className={`font-mono text-sm ${
-                            co.status === "approved"
-                              ? "text-green-400"
-                              : co.status === "rejected"
-                              ? "text-red-400"
-                              : "text-zinc-400"
-                          }`}
-                        >
-                          ${co.amount.toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-
-              {/* Purchase Orders */}
-              <Card title="Purchase Orders">
-                {(project.purchaseOrders || []).length === 0 ? (
-                  <p className="text-sm text-zinc-600 py-2">
-                    No purchase orders yet.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {project.purchaseOrders.map((po) => (
-                      <div
-                        key={po.id}
-                        className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3"
-                      >
-                        <div>
-                          <p className="text-sm text-zinc-300">
-                            {po.description}
-                          </p>
-                          <p className="text-xs text-zinc-600 font-mono">
-                            {po.vendor} · {po.status} ·{" "}
-                            {new Date(po.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <span className="font-mono text-sm text-zinc-400">
-                          ${po.amount.toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-
-              {/* Time Entries */}
-              <Card title="Time Log">
-                {(project.timeEntries || []).length === 0 ? (
-                  <p className="text-sm text-zinc-600 py-2">
-                    No time entries yet.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {project.timeEntries.map((te) => (
-                      <div
-                        key={te.id}
-                        className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3"
-                      >
-                        <div>
-                          <p className="text-sm text-zinc-300">
-                            {te.user.name}
-                          </p>
-                          <p className="text-xs text-zinc-600 font-mono">
-                            {new Date(te.date).toLocaleDateString()}
-                            {te.note ? ` · ${te.note}` : ""}
-                          </p>
-                        </div>
-                        <span className="font-mono text-sm text-zinc-400">
-                          {te.hours}h
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            </>
+            <FinancialsTab
+              project={project}
+              onRefresh={fetchProject}
+            />
           )}
 
           {activeTab === "files" && (
@@ -869,5 +771,394 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <span className="text-zinc-600 text-xs font-mono">{label}</span>
       <p className="text-zinc-300">{value}</p>
     </div>
+  );
+}
+
+// ─── Financials Tab ──────────────────────────────────────────
+function FinancialsTab({
+  project,
+  onRefresh,
+}: {
+  project: Project;
+  onRefresh: () => void;
+}) {
+  // ── Change Order form state
+  const [coDesc, setCoDesc] = useState("");
+  const [coAmount, setCoAmount] = useState("");
+  const [coStatus, setCoStatus] = useState("pending");
+  const [coSaving, setCoSaving] = useState(false);
+
+  // ── Purchase Order form state
+  const [poVendor, setPoVendor] = useState("");
+  const [poDesc, setPoDesc] = useState("");
+  const [poAmount, setPoAmount] = useState("");
+  const [poStatus, setPoStatus] = useState("pending");
+  const [poSaving, setPoSaving] = useState(false);
+
+  // ── Time Entry form state
+  const [teDate, setTeDate] = useState(new Date().toISOString().split("T")[0]);
+  const [teHours, setTeHours] = useState("");
+  const [teNote, setTeNote] = useState("");
+  const [teSaving, setTeSaving] = useState(false);
+
+  const addChangeOrder = async () => {
+    if (!coDesc.trim() || !coAmount) return;
+    setCoSaving(true);
+    await fetch("/api/change-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: project.id,
+        description: coDesc.trim(),
+        amount: coAmount,
+        status: coStatus,
+      }),
+    });
+    setCoDesc("");
+    setCoAmount("");
+    setCoStatus("pending");
+    setCoSaving(false);
+    onRefresh();
+  };
+
+  const addPurchaseOrder = async () => {
+    if (!poVendor.trim() || !poDesc.trim() || !poAmount) return;
+    setPoSaving(true);
+    await fetch("/api/purchase-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: project.id,
+        vendor: poVendor.trim(),
+        description: poDesc.trim(),
+        amount: poAmount,
+        status: poStatus,
+      }),
+    });
+    setPoVendor("");
+    setPoDesc("");
+    setPoAmount("");
+    setPoStatus("pending");
+    setPoSaving(false);
+    onRefresh();
+  };
+
+  const addTimeEntry = async () => {
+    if (!teDate || !teHours) return;
+    setTeSaving(true);
+    await fetch("/api/time-entries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: project.id,
+        date: teDate,
+        hours: teHours,
+        note: teNote.trim(),
+      }),
+    });
+    setTeDate(new Date().toISOString().split("T")[0]);
+    setTeHours("");
+    setTeNote("");
+    setTeSaving(false);
+    onRefresh();
+  };
+
+  const coTotal = (project.changeOrders || [])
+    .filter((co) => co.status === "approved")
+    .reduce((s, co) => s + co.amount, 0);
+  const poTotal = (project.purchaseOrders || []).reduce(
+    (s, po) => s + po.amount,
+    0
+  );
+  const teTotal = (project.timeEntries || []).reduce(
+    (s, te) => s + te.hours,
+    0
+  );
+  const contractValue = project.value || 0;
+  const grandTotal = contractValue + coTotal;
+
+  const inputCls =
+    "rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500";
+
+  return (
+    <>
+      {/* Change Orders */}
+      <Card title="Change Orders">
+        {(project.changeOrders || []).length > 0 && (
+          <div className="space-y-2 mb-4">
+            {project.changeOrders.map((co) => (
+              <div
+                key={co.id}
+                className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3"
+              >
+                <div>
+                  <p className="text-sm text-zinc-300">{co.description}</p>
+                  <p className="text-xs text-zinc-600 font-mono">
+                    {co.status} &middot;{" "}
+                    {new Date(co.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <span
+                  className={`font-mono text-sm ${
+                    co.status === "approved"
+                      ? "text-green-400"
+                      : co.status === "rejected"
+                      ? "text-red-400"
+                      : "text-zinc-400"
+                  }`}
+                >
+                  ${co.amount.toLocaleString()}
+                </span>
+              </div>
+            ))}
+            <div className="flex justify-between px-3 pt-2 border-t border-zinc-800">
+              <span className="text-xs font-mono text-zinc-500">
+                Approved Total
+              </span>
+              <span className="text-sm font-mono text-green-400">
+                +${coTotal.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Inline form */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={coDesc}
+            onChange={(e) => setCoDesc(e.target.value)}
+            placeholder="Description"
+            className={`flex-1 ${inputCls}`}
+          />
+          <input
+            type="number"
+            value={coAmount}
+            onChange={(e) => setCoAmount(e.target.value)}
+            placeholder="Amount"
+            className={`w-28 font-mono ${inputCls}`}
+            min="0"
+            step="0.01"
+          />
+          <select
+            value={coStatus}
+            onChange={(e) => setCoStatus(e.target.value)}
+            className={`w-32 ${inputCls}`}
+          >
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button
+            onClick={addChangeOrder}
+            disabled={coSaving || !coDesc.trim() || !coAmount}
+            className="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {coSaving ? "..." : "Add CO"}
+          </button>
+        </div>
+      </Card>
+
+      {/* Purchase Orders */}
+      <Card title="Purchase Orders">
+        {(project.purchaseOrders || []).length > 0 && (
+          <div className="space-y-2 mb-4">
+            {project.purchaseOrders.map((po) => (
+              <div
+                key={po.id}
+                className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3"
+              >
+                <div>
+                  <p className="text-sm text-zinc-300">{po.description}</p>
+                  <p className="text-xs text-zinc-600 font-mono">
+                    {po.vendor} &middot; {po.status} &middot;{" "}
+                    {new Date(po.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <span className="font-mono text-sm text-zinc-400">
+                  ${po.amount.toLocaleString()}
+                </span>
+              </div>
+            ))}
+            <div className="flex justify-between px-3 pt-2 border-t border-zinc-800">
+              <span className="text-xs font-mono text-zinc-500">
+                Total Material Cost
+              </span>
+              <span className="text-sm font-mono text-zinc-400">
+                ${poTotal.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Inline form */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={poVendor}
+            onChange={(e) => setPoVendor(e.target.value)}
+            placeholder="Vendor"
+            className={`w-32 ${inputCls}`}
+          />
+          <input
+            type="text"
+            value={poDesc}
+            onChange={(e) => setPoDesc(e.target.value)}
+            placeholder="Description"
+            className={`flex-1 ${inputCls}`}
+          />
+          <input
+            type="number"
+            value={poAmount}
+            onChange={(e) => setPoAmount(e.target.value)}
+            placeholder="Amount"
+            className={`w-28 font-mono ${inputCls}`}
+            min="0"
+            step="0.01"
+          />
+          <select
+            value={poStatus}
+            onChange={(e) => setPoStatus(e.target.value)}
+            className={`w-32 ${inputCls}`}
+          >
+            <option value="pending">Pending</option>
+            <option value="ordered">Ordered</option>
+            <option value="received">Received</option>
+          </select>
+          <button
+            onClick={addPurchaseOrder}
+            disabled={poSaving || !poVendor.trim() || !poDesc.trim() || !poAmount}
+            className="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {poSaving ? "..." : "Add PO"}
+          </button>
+        </div>
+      </Card>
+
+      {/* Time Entries */}
+      <Card title="Time Log">
+        {(project.timeEntries || []).length > 0 && (
+          <div className="space-y-2 mb-4">
+            {project.timeEntries.map((te) => (
+              <div
+                key={te.id}
+                className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3"
+              >
+                <div>
+                  <p className="text-sm text-zinc-300">{te.user.name}</p>
+                  <p className="text-xs text-zinc-600 font-mono">
+                    {new Date(te.date).toLocaleDateString()}
+                    {te.note ? ` · ${te.note}` : ""}
+                  </p>
+                </div>
+                <span className="font-mono text-sm text-zinc-400">
+                  {te.hours}h
+                </span>
+              </div>
+            ))}
+            <div className="flex justify-between px-3 pt-2 border-t border-zinc-800">
+              <span className="text-xs font-mono text-zinc-500">
+                Total Hours
+              </span>
+              <span className="text-sm font-mono text-zinc-400">
+                {teTotal}h
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Inline form */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="date"
+            value={teDate}
+            onChange={(e) => setTeDate(e.target.value)}
+            className={`w-36 font-mono ${inputCls}`}
+          />
+          <input
+            type="number"
+            value={teHours}
+            onChange={(e) => setTeHours(e.target.value)}
+            placeholder="Hours"
+            className={`w-24 font-mono ${inputCls}`}
+            min="0"
+            step="0.25"
+          />
+          <input
+            type="text"
+            value={teNote}
+            onChange={(e) => setTeNote(e.target.value)}
+            placeholder="Notes (optional)"
+            className={`flex-1 ${inputCls}`}
+          />
+          <button
+            onClick={addTimeEntry}
+            disabled={teSaving || !teDate || !teHours}
+            className="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {teSaving ? "..." : "Log Time"}
+          </button>
+        </div>
+      </Card>
+
+      {/* Grand Total Summary */}
+      <Card title="Project Financial Summary">
+        <div className="space-y-2.5 font-mono text-sm">
+          <div className="flex justify-between">
+            <span className="text-zinc-500">Contract Value</span>
+            <span className="text-zinc-200">
+              ${contractValue.toLocaleString()}
+            </span>
+          </div>
+          {coTotal > 0 && (
+            <div className="flex justify-between">
+              <span className="text-zinc-500">
+                + Approved Change Orders
+              </span>
+              <span className="text-green-400">
+                +${coTotal.toLocaleString()}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between pt-2 border-t border-zinc-800">
+            <span className="text-zinc-300 font-semibold">
+              Adjusted Contract
+            </span>
+            <span className="text-white font-semibold">
+              ${grandTotal.toLocaleString()}
+            </span>
+          </div>
+          {poTotal > 0 && (
+            <div className="flex justify-between">
+              <span className="text-zinc-500">
+                - Material Costs (POs)
+              </span>
+              <span className="text-red-400">
+                -${poTotal.toLocaleString()}
+              </span>
+            </div>
+          )}
+          {(poTotal > 0 || coTotal > 0) && (
+            <div className="flex justify-between pt-2 border-t border-zinc-800">
+              <span className="text-zinc-300 font-semibold">
+                Gross Margin
+              </span>
+              <span
+                className={`font-semibold ${
+                  grandTotal - poTotal >= 0
+                    ? "text-green-400"
+                    : "text-red-400"
+                }`}
+              >
+                ${(grandTotal - poTotal).toLocaleString()}
+              </span>
+            </div>
+          )}
+          {teTotal > 0 && (
+            <div className="flex justify-between text-zinc-500 text-xs pt-1">
+              <span>Hours Logged</span>
+              <span>{teTotal}h</span>
+            </div>
+          )}
+        </div>
+      </Card>
+    </>
   );
 }
