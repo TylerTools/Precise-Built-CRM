@@ -458,7 +458,8 @@ export default function SettingsPage() {
         )}
       </Section>
 
-      {/* Integrations */}
+      {/* Integrations — Owner Only */}
+      {isOwner && (
       <Section title="Integrations">
         <div className="space-y-4">
           <p className="text-xs font-mono text-[#c47a4f] uppercase tracking-wider">Google Drive</p>
@@ -522,6 +523,7 @@ export default function SettingsPage() {
           )}
         </div>
       </Section>
+      )}
 
       {/* Email Templates */}
       <Section title="Email Templates">
