@@ -37,6 +37,11 @@ export async function POST(request: Request) {
   // For dev: local path. In prod: swap to cloud storage URL
   const url = `/uploads/${filename}`;
 
+  // Profile uploads don't belong to a project — skip File record
+  if (projectId === "profile") {
+    return NextResponse.json({ url }, { status: 201 });
+  }
+
   const dbFile = await prisma.file.create({
     data: { projectId, filename: file.name, url },
   });
