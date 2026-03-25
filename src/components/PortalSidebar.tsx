@@ -140,7 +140,7 @@ export default function PortalSidebar() {
               alt="PB"
               width={32}
               height={32}
-              className="brightness-0 invert opacity-90 h-8 w-8 object-contain"
+              className="brightness-0 invert opacity-90 h-12 w-12 object-contain"
             />
           ) : (
             <Image
@@ -148,7 +148,7 @@ export default function PortalSidebar() {
               alt="Precise Built"
               width={240}
               height={56}
-              className="brightness-0 invert opacity-90 w-full h-12 object-contain"
+              className="brightness-0 invert opacity-90 w-full h-[72px] object-contain"
             />
           )}
         </Link>
