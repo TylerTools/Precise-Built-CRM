@@ -82,7 +82,7 @@ export const STAGES: StageDefinition[] = [
   {
     key: "S5",
     label: "Contract & Deposit",
-    shortLabel: "Close",
+    shortLabel: "Project Handoff",
     division: "SALES",
     color: "bg-emerald-500",
     textColor: "text-emerald-400",

@@ -28,6 +28,30 @@ export async function GET() {
   return NextResponse.json(contacts);
 }
 
+export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { name, phone, email, source, notes } = await request.json();
+  if (!name) {
+    return NextResponse.json({ error: "name is required" }, { status: 400 });
+  }
+
+  const contact = await prisma.contact.create({
+    data: {
+      name,
+      phone: phone || "",
+      email: email || "",
+      source: source || "other",
+      notes: notes || "",
+    },
+  });
+
+  return NextResponse.json(contact, { status: 201 });
+}
+
 export async function PATCH(request: Request) {
   const session = await getSession();
   if (!session) {

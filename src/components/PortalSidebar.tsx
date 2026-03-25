@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { SALES_STAGES, OPS_STAGES } from "@/lib/stages";
 import type { StageDefinition } from "@/lib/stages";
+import NewLeadModal from "@/components/NewLeadModal";
 
 function StageLink({
   stage,
@@ -41,6 +42,7 @@ export default function PortalSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [salesOpen, setSalesOpen] = useState(true);
   const [opsOpen, setOpsOpen] = useState(true);
+  const [showNewLead, setShowNewLead] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
@@ -165,6 +167,16 @@ export default function PortalSidebar() {
           "Dashboard",
           <DashboardIcon active={isActive("/dashboard")} />
         )}
+        <button
+          onClick={() => setShowNewLead(true)}
+          title="New Lead"
+          className="flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-lg text-sm font-syne font-semibold bg-[#c47a4f] hover:bg-[#b06a3f] text-white transition-colors"
+        >
+          <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          {!collapsed && <span>New Lead</span>}
+        </button>
       </nav>
 
       {/* Sales section */}
@@ -271,6 +283,16 @@ export default function PortalSidebar() {
             className="h-6 w-auto brightness-0 invert opacity-90"
           />
         </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowNewLead(true)}
+            className="flex items-center gap-1.5 bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-xs font-syne font-semibold px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Lead
+          </button>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           className="p-2 text-zinc-400"
@@ -284,6 +306,7 @@ export default function PortalSidebar() {
             )}
           </svg>
         </button>
+        </div>
       </div>
 
       {/* Mobile slide-out */}
@@ -298,6 +321,7 @@ export default function PortalSidebar() {
           </aside>
         </>
       )}
+      <NewLeadModal open={showNewLead} onClose={() => setShowNewLead(false)} />
     </>
   );
 }
