@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SALES_STAGES, OPS_STAGES } from "@/lib/stages";
 import type { StageDefinition } from "@/lib/stages";
 
@@ -34,6 +34,16 @@ export default function PortalSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user?.role) setUserRole(data.user.role);
+      })
+      .catch(() => {});
+  }, []);
 
   // Don't render sidebar on login page
   if (pathname === "/login") return null;
@@ -105,6 +115,25 @@ export default function PortalSidebar() {
           ))}
         </div>
       </div>
+
+      {/* Admin: Team link */}
+      {userRole === "admin" && (
+        <div className="px-3 mt-2">
+          <div className="border-t border-zinc-800/50 my-3" />
+          <Link
+            href="/settings/team"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              pathname === "/settings/team"
+                ? "bg-brand-500/15 text-brand-400"
+                : "text-zinc-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <TeamIcon active={pathname === "/settings/team"} />
+            Team
+          </Link>
+        </div>
+      )}
 
       {/* Bottom */}
       <div className="p-3 border-t border-zinc-800/50">
@@ -179,6 +208,14 @@ function ProjectsIcon({ active }: { active: boolean }) {
   return (
     <svg className={`w-5 h-5 ${active ? "text-brand-400" : "text-zinc-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+  );
+}
+
+function TeamIcon({ active }: { active: boolean }) {
+  return (
+    <svg className={`w-5 h-5 ${active ? "text-brand-400" : "text-zinc-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
     </svg>
   );
 }

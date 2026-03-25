@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { projectId, label } = await request.json();
+  const { projectId, label, assignedUserId, dueDate, priority } = await request.json();
   if (!projectId || !label) {
     return NextResponse.json(
       { error: "projectId and label are required" },
@@ -19,7 +19,14 @@ export async function POST(request: Request) {
   }
 
   const task = await prisma.task.create({
-    data: { projectId, label },
+    data: {
+      projectId,
+      label,
+      ...(assignedUserId && { assignedUserId }),
+      ...(dueDate && { dueDate: new Date(dueDate) }),
+      ...(priority && { priority }),
+    },
+    include: { assignedUser: { select: { id: true, name: true } } },
   });
 
   return NextResponse.json(task, { status: 201 });
@@ -31,17 +38,24 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, completed } = await request.json();
-  if (!id || completed === undefined) {
+  const { id, completed, label, assignedUserId, dueDate, priority } = await request.json();
+  if (!id) {
     return NextResponse.json(
-      { error: "id and completed are required" },
+      { error: "id is required" },
       { status: 400 }
     );
   }
 
   const task = await prisma.task.update({
     where: { id },
-    data: { completed },
+    data: {
+      ...(completed !== undefined && { completed }),
+      ...(label !== undefined && { label }),
+      ...(assignedUserId !== undefined && { assignedUserId: assignedUserId || null }),
+      ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
+      ...(priority !== undefined && { priority }),
+    },
+    include: { assignedUser: { select: { id: true, name: true } } },
   });
 
   return NextResponse.json(task);

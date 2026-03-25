@@ -18,7 +18,10 @@ export async function GET(
     include: {
       contact: true,
       assignedUser: { select: { id: true, name: true, email: true } },
-      tasks: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      tasks: {
+        include: { assignedUser: { select: { id: true, name: true } } },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
       files: { orderBy: { uploadedAt: "desc" } },
       changeOrders: { orderBy: { createdAt: "desc" } },
       purchaseOrders: { orderBy: { createdAt: "desc" } },
@@ -69,6 +72,7 @@ export async function PATCH(
     where: { id: params.id },
     data: {
       ...(body.stage !== undefined && { stage: body.stage }),
+      ...(body.jobType !== undefined && { jobType: body.jobType }),
       ...(body.address !== undefined && { address: body.address }),
       ...(body.scope !== undefined && { scope: body.scope }),
       ...(body.value !== undefined && { value: body.value ? parseFloat(body.value) : null }),
