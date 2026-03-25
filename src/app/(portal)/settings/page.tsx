@@ -14,6 +14,8 @@ interface SettingsData {
   inviteEmailBody: string;
   stageEmailSubject: string;
   stageEmailBody: string;
+  driveConnected: boolean;
+  sharedDriveId: string;
   bgImageUrl: string;
   bgImageOpacity: number;
   bgStyle: string;
@@ -41,6 +43,8 @@ const defaults: SettingsData = {
     "Hi {{name}}, your account has been created. Email: {{email}} Password: {{password}} Login at: {{loginUrl}}",
   stageEmailSubject: "Project stage updated",
   stageEmailBody: "Project {{project}} has moved to {{stage}}",
+  driveConnected: false,
+  sharedDriveId: "0AMK9dkBAqTzpUk9PVA",
   bgImageUrl: "",
   bgImageOpacity: 1.0,
   bgStyle: "solid",
@@ -452,6 +456,71 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+      </Section>
+
+      {/* Integrations */}
+      <Section title="Integrations">
+        <div className="space-y-4">
+          <p className="text-xs font-mono text-[#c47a4f] uppercase tracking-wider">Google Drive</p>
+          <div className="flex items-center gap-3">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                settings.driveConnected ? "bg-emerald-500" : "bg-red-500"
+              }`}
+            />
+            <span className="text-sm text-zinc-300">
+              {settings.driveConnected ? "Connected" : "Not Connected"}
+            </span>
+          </div>
+          {!settings.driveConnected ? (
+            <a
+              href="/api/auth/google-drive"
+              className="inline-flex items-center gap-2 bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7.71 3.5L1.15 15l3.43 5.96h6.86L7.71 3.5zm1.14 0l3.71 6.45H21l-3.71-6.45H8.85zm4.57 7.95L9.71 18.4l3.43 5.96L21.57 11.45h-8.15z" />
+              </svg>
+              Connect Google Drive
+            </a>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-emerald-400 font-mono">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Connected
+              </div>
+              <Field
+                label="Shared Drive ID"
+                value={settings.sharedDriveId}
+                onChange={(v: string) => setSettings({ ...settings, sharedDriveId: v })}
+              />
+              <div className="flex items-center gap-3">
+                <SaveButton
+                  section="integrations"
+                  saving={savingSection === "integrations"}
+                  saved={savedSection === "integrations"}
+                  onClick={() =>
+                    save("integrations", {
+                      sharedDriveId: settings.sharedDriveId,
+                    } as Partial<SettingsData>)
+                  }
+                />
+                <button
+                  onClick={async () => {
+                    await save("integrations-disconnect", {
+                      driveConnected: false,
+                    } as Partial<SettingsData>);
+                    setSettings((prev: SettingsData) => ({ ...prev, driveConnected: false }));
+                  }}
+                  className="border border-red-800 text-red-400 hover:text-red-300 hover:border-red-600 text-sm px-4 py-2 rounded-lg transition-colors"
+                >
+                  Disconnect
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </Section>
 
       {/* Email Templates */}

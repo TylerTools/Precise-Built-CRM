@@ -58,6 +58,8 @@ model Project {
   notes          String    @default("")
   archived       Boolean   @default(false)
   archivedAt     DateTime? @map("archived_at")
+  driveFolderId  String?   @map("drive_folder_id")
+  driveFolderUrl String?   @map("drive_folder_url")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -215,6 +217,9 @@ model Settings {
   stageEmailBody     String   @default("Project {{project}} has moved to {{stage}}") @map("stage_email_body")
   driveConnected     Boolean  @default(false) @map("drive_connected")
   driveRefreshToken  String?  @map("drive_refresh_token")
+  driveAccessToken   String?  @map("drive_access_token")
+  driveTokenExpiry   DateTime? @map("drive_token_expiry")
+  sharedDriveId      String   @default("0AMK9dkBAqTzpUk9PVA") @map("shared_drive_id")
   bgImageUrl         String?  @map("bg_image_url")
   bgImageOpacity     Float    @default(1.0) @map("bg_image_opacity")
   bgStyle            String   @default("solid") @map("bg_style")

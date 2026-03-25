@@ -74,6 +74,8 @@ interface Project {
   value: number | null;
   notes: string;
   archived: boolean;
+  driveFolderId: string | null;
+  driveFolderUrl: string | null;
   startDate: string | null;
   endDate: string | null;
   createdAt: string;
@@ -979,6 +981,21 @@ export default function ProjectDetailPage() {
 
           {activeTab === "files" && (
             <Card title="Photos & Files">
+              {project.driveFolderUrl && (
+                <div className="mb-4">
+                  <a
+                    href={project.driveFolderUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-mono text-blue-400 hover:text-blue-300 border border-zinc-700 rounded-lg px-4 py-2 transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M7.71 3.5L1.15 15l3.43 5.96h6.86L7.71 3.5zm1.14 0l3.71 6.45H21l-3.71-6.45H8.85zm4.57 7.95L9.71 18.4l3.43 5.96L21.57 11.45h-8.15z" />
+                    </svg>
+                    Open in Google Drive
+                  </a>
+                </div>
+              )}
               {project.files.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
                   {project.files.map((file) => (

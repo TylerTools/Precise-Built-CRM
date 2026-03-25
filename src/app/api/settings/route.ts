@@ -4,6 +4,13 @@ import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+// Fields that must never be returned in GET responses
+const sensitiveFields = [
+  "driveRefreshToken",
+  "driveAccessToken",
+  "driveTokenExpiry",
+];
+
 export async function GET() {
   const session = await getSession();
   if (!session) {
@@ -18,7 +25,13 @@ export async function GET() {
     settings = await prisma.settings.create({ data: { id: "singleton" } });
   }
 
-  return NextResponse.json(settings);
+  // Strip sensitive fields
+  const safe: Record<string, unknown> = { ...settings };
+  for (const key of sensitiveFields) {
+    delete safe[key];
+  }
+
+  return NextResponse.json(safe);
 }
 
 const appearanceFields = [
@@ -58,6 +71,9 @@ export async function PATCH(request: Request) {
     "stageEmailBody",
     "driveConnected",
     "driveRefreshToken",
+    "driveAccessToken",
+    "driveTokenExpiry",
+    "sharedDriveId",
     ...appearanceFields,
   ];
 
@@ -84,5 +100,11 @@ export async function PATCH(request: Request) {
     create: { id: "singleton", ...data },
   });
 
-  return NextResponse.json(settings);
+  // Strip sensitive fields from response
+  const safe: Record<string, unknown> = { ...settings };
+  for (const key of sensitiveFields) {
+    delete safe[key];
+  }
+
+  return NextResponse.json(safe);
 }

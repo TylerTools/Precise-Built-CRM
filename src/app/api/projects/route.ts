@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { getOrCreateClientFolder } from "@/lib/google-drive";
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +55,26 @@ export async function POST(request: Request) {
     },
   });
 
-  // Integration hook point: create calendar event for new project
-  // await createGoogleCalendarEvent(project.id);
+  // Auto-create Google Drive folder if connected
+  try {
+    const settings = await prisma.settings.findUnique({
+      where: { id: "singleton" },
+    });
+    if (settings?.driveConnected && settings?.driveRefreshToken) {
+      const clientName = project.contact.name;
+      const projectName = `${jobType} - ${address || project.id.slice(0, 8)}`;
+      const { folderId, folderUrl } = await getOrCreateClientFolder(
+        clientName,
+        projectName
+      );
+      await prisma.project.update({
+        where: { id: project.id },
+        data: { driveFolderId: folderId, driveFolderUrl: folderUrl },
+      });
+    }
+  } catch (err) {
+    console.error("Drive folder creation failed:", err);
+  }
 
   return NextResponse.json(project, { status: 201 });
 }
