@@ -138,8 +138,8 @@ export default function PortalSidebar() {
             alt="Precise Built"
             width={300}
             height={84}
-            className={`brightness-0 invert opacity-90 w-full ${
-              collapsed ? "h-9 w-auto" : "h-[60px]"
+            className={`brightness-0 invert opacity-90 object-contain ${
+              collapsed ? "h-9 w-auto" : "w-full h-16"
             }`}
           />
         </Link>
@@ -211,11 +211,12 @@ export default function PortalSidebar() {
       <div className="px-2 space-y-1 mb-2">
         <div className="border-t border-zinc-800/50 my-2" />
 
-        {navItem(
-          "/projects/archived",
-          "Archived",
-          <ArchiveIcon active={isActive("/projects/archived")} />
-        )}
+        {(userRole === "owner" || userRole === "admin") &&
+          navItem(
+            "/projects?archived=true",
+            "Archived",
+            <ArchiveIcon active={false} />
+          )}
 
         {navItem(
           "/clients",
