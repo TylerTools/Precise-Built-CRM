@@ -57,7 +57,7 @@ export default function TeamPage() {
   const [showProfileModal, setShowProfileModal] = useState<TeamMember | null>(null);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [form, setForm] = useState({ name: "", email: "", role: "tech", password: "" });
-  const [editForm, setEditForm] = useState({ name: "", email: "", role: "", phone: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", role: "", phone: "", profileImage: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -164,8 +164,23 @@ export default function TeamPage() {
     window.location.reload();
   };
 
+  const handleProfileImageUpload = async (file: File, userId: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("projectId", "profile");
+    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+    if (!uploadRes.ok) return;
+    const { url } = await uploadRes.json();
+    await fetch(`/api/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileImage: url }),
+    });
+    fetchMembers();
+  };
+
   const openEdit = (m: TeamMember) => {
-    setEditForm({ name: m.name, email: m.email, role: m.role, phone: m.phone || "" });
+    setEditForm({ name: m.name, email: m.email, role: m.role, phone: m.phone || "", profileImage: m.profileImage || "" });
     setEditingMember(m);
     setError("");
   };
@@ -348,6 +363,55 @@ export default function TeamPage() {
       {editingMember && (
         <Modal onClose={() => setEditingMember(null)} title={`Edit ${editingMember.name}`}>
           {error && <ErrorBox message={error} />}
+          {/* Profile Picture Upload */}
+          <div className="flex items-center gap-4 mb-4">
+            {editForm.profileImage ? (
+              <img src={editForm.profileImage} alt={editingMember.name} className="w-16 h-16 rounded-full object-cover" />
+            ) : (
+              <InitialsAvatar name={editingMember.name} size="lg" />
+            )}
+            <div>
+              <label className="inline-flex items-center gap-2 text-xs font-mono text-[#c47a4f] hover:text-[#d89a6f] cursor-pointer border border-zinc-700 rounded-lg px-3 py-1.5 transition-colors">
+                Upload Photo
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    await handleProfileImageUpload(file, editingMember.id);
+                    // Update local state immediately
+                    const updatedMembers = await fetch("/api/users").then(r => r.json());
+                    if (Array.isArray(updatedMembers)) {
+                      const updated = updatedMembers.find((u: TeamMember) => u.id === editingMember.id);
+                      if (updated) {
+                        setEditForm(prev => ({ ...prev, profileImage: updated.profileImage || "" }));
+                        setEditingMember(updated);
+                      }
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {editForm.profileImage && (
+                <button
+                  onClick={async () => {
+                    await fetch(`/api/users/${editingMember.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ profileImage: "" }),
+                    });
+                    setEditForm(prev => ({ ...prev, profileImage: "" }));
+                    fetchMembers();
+                  }}
+                  className="text-xs font-mono text-zinc-600 hover:text-red-400 ml-2 transition-colors"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
           <div className="space-y-4">
             <Field label="Name" value={editForm.name} onChange={(v) => setEditForm({ ...editForm, name: v })} />
             <Field label="Email" value={editForm.email} onChange={(v) => setEditForm({ ...editForm, email: v })} type="email" />
@@ -394,6 +458,27 @@ export default function TeamPage() {
             <span className={`text-xs font-mono px-2 py-1 rounded mt-2 ${roleBadgeColor(showProfileModal.role)}`}>
               {roleLabel(showProfileModal.role)}
             </span>
+            {canEditMember(showProfileModal) && (
+              <label className="mt-3 inline-flex items-center gap-2 text-xs font-mono text-[#c47a4f] hover:text-[#d89a6f] cursor-pointer border border-zinc-700 rounded-lg px-3 py-1.5 transition-colors">
+                Change Photo
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !showProfileModal) return;
+                    await handleProfileImageUpload(file, showProfileModal.id);
+                    const updatedMembers = await fetch("/api/users").then(r => r.json());
+                    if (Array.isArray(updatedMembers)) {
+                      const updated = updatedMembers.find((u: TeamMember) => u.id === showProfileModal.id);
+                      if (updated) setShowProfileModal(updated);
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            )}
           </div>
           <div className="space-y-3 text-sm">
             <ProfileRow label="Email" value={showProfileModal.email} />

@@ -56,6 +56,8 @@ model Project {
   startDate      DateTime? @map("start_date")
   endDate        DateTime? @map("end_date")
   notes          String    @default("")
+  archived       Boolean   @default(false)
+  archivedAt     DateTime? @map("archived_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -68,6 +70,7 @@ model Project {
   timeEntries    TimeEntry[]
   documents      Document[]
   stageHistory   StageHistory[]
+  media          ProjectMedia[]
 
   @@map("projects")
 }
@@ -179,6 +182,23 @@ model StageHistory {
   @@map("stage_history")
 }
 
+// ─── Project Media ──────────────────────────────────────────
+model ProjectMedia {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  fileName    String   @map("file_name")
+  fileType    String   @map("file_type")
+  blobUrl     String   @map("blob_url")
+  driveFileId String?  @map("drive_file_id")
+  driveUrl    String?  @map("drive_url")
+  uploadedBy  String   @map("uploaded_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_media")
+}
+
 // ─── Settings (Singleton) ───────────────────────────────────
 model Settings {
   id                 String   @id @default("singleton")
@@ -193,6 +213,8 @@ model Settings {
   inviteEmailBody    String   @default("Hi {{name}}, your account has been created. Email: {{email}} Password: {{password}} Login at: {{loginUrl}}") @map("invite_email_body")
   stageEmailSubject  String   @default("Project stage updated") @map("stage_email_subject")
   stageEmailBody     String   @default("Project {{project}} has moved to {{stage}}") @map("stage_email_body")
+  driveConnected     Boolean  @default(false) @map("drive_connected")
+  driveRefreshToken  String?  @map("drive_refresh_token")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 

@@ -56,6 +56,15 @@ interface TimeEntry {
   user: { name: string };
 }
 
+interface MediaRecord {
+  id: string;
+  fileName: string;
+  fileType: string;
+  blobUrl: string;
+  driveUrl: string | null;
+  createdAt: string;
+}
+
 interface Project {
   id: string;
   jobType: string;
@@ -64,6 +73,7 @@ interface Project {
   scope: string;
   value: number | null;
   notes: string;
+  archived: boolean;
   startDate: string | null;
   endDate: string | null;
   createdAt: string;
@@ -76,7 +86,7 @@ interface Project {
   timeEntries: TimeEntry[];
 }
 
-type Tab = "overview" | "tasks" | "financials" | "files";
+type Tab = "overview" | "tasks" | "financials" | "files" | "media";
 
 // ─── Inline Edit Field ──────────────────────────────────────
 function InlineField({
@@ -149,6 +159,9 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
   const [saving, setSaving] = useState(false);
+  const [media, setMedia] = useState<MediaRecord[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
 
   // Task form state
   const [newTaskLabel, setNewTaskLabel] = useState("");
@@ -176,15 +189,31 @@ export default function ProjectDetailPage() {
       });
   }, [params.id, router]);
 
+  const fetchMedia = useCallback(() => {
+    fetch(`/api/projects/${params.id}/media`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setMedia(data);
+      })
+      .catch(() => {});
+  }, [params.id]);
+
   useEffect(() => {
     fetchProject();
+    fetchMedia();
     fetch("/api/users")
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setTeamUsers(data);
       })
       .catch(() => {});
-  }, [fetchProject]);
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user?.role) setUserRole(data.user.role);
+      })
+      .catch(() => {});
+  }, [fetchProject, fetchMedia]);
 
   if (loading || !project) {
     return (
@@ -357,7 +386,34 @@ export default function ProjectDetailPage() {
     { key: "tasks", label: "Tasks" },
     { key: "financials", label: "Financials" },
     { key: "files", label: "Files" },
+    { key: "media", label: "Media" },
   ];
+
+  const uploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    await fetch(`/api/projects/${params.id}/media`, { method: "POST", body: formData });
+    fetchMedia();
+    e.target.value = "";
+  };
+
+  const deleteMedia = async (mediaId: string) => {
+    await fetch(`/api/projects/${params.id}/media/${mediaId}`, { method: "DELETE" });
+    fetchMedia();
+  };
+
+  const toggleArchive = async () => {
+    const newArchived = !project.archived;
+    await patchProject({
+      archived: newArchived,
+      ...(newArchived ? { archivedAt: new Date().toISOString() } : { archivedAt: null }),
+    });
+    setShowArchiveModal(false);
+  };
+
+  const canArchive = userRole === "admin" || userRole === "owner";
 
   return (
     <div className="p-4 lg:p-8 max-w-6xl mx-auto">
@@ -432,7 +488,63 @@ export default function ProjectDetailPage() {
             Advance to {STAGE_MAP[nextStageKey]?.shortLabel} &rarr;
           </button>
         )}
+        {canArchive && (
+          <button
+            onClick={() => setShowArchiveModal(true)}
+            className={`text-xs font-mono px-4 py-2 rounded-lg border transition-colors ml-auto ${
+              project.archived
+                ? "border-emerald-700 text-emerald-400 hover:border-emerald-500"
+                : "border-zinc-700 text-zinc-500 hover:border-red-500 hover:text-red-400"
+            }`}
+          >
+            {project.archived ? "Restore Project" : "Archive Project"}
+          </button>
+        )}
       </div>
+
+      {/* Archive confirmation modal */}
+      {showArchiveModal && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setShowArchiveModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-[#0e0e0f] border border-zinc-800 rounded-xl p-6 w-full max-w-sm shadow-2xl">
+              <h2 className="text-lg font-syne font-bold text-white mb-3">
+                {project.archived ? "Restore Project?" : "Archive Project?"}
+              </h2>
+              <p className="text-sm text-zinc-400 mb-6">
+                {project.archived
+                  ? "This project will be visible in active views again."
+                  : "This project will be hidden from active views. You can restore it later from the Archived tab."}
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowArchiveModal(false)}
+                  className="text-sm font-mono text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={toggleArchive}
+                  className={`text-sm font-semibold px-5 py-2 rounded-lg transition-colors ${
+                    project.archived
+                      ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                      : "bg-red-600 hover:bg-red-500 text-white"
+                  }`}
+                >
+                  {project.archived ? "Restore" : "Archive"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Archived banner */}
+      {project.archived && (
+        <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400 font-mono">
+          This project is archived.
+        </div>
+      )}
 
       {/* Project Header */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
@@ -900,6 +1012,65 @@ export default function ProjectDetailPage() {
                 </svg>
                 Upload File
                 <input type="file" onChange={uploadFile} className="hidden" accept="image/*,.pdf,.doc,.docx" />
+              </label>
+            </Card>
+          )}
+
+          {activeTab === "media" && (
+            <Card title="Project Media">
+              {media.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                  {media.map((m) => (
+                    <div key={m.id} className="relative group">
+                      {m.fileType === "image" ? (
+                        <a href={m.blobUrl} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={m.blobUrl}
+                            alt={m.fileName}
+                            className="w-full h-32 object-cover rounded-lg border border-zinc-700"
+                          />
+                        </a>
+                      ) : m.fileType === "video" ? (
+                        <video
+                          src={m.blobUrl}
+                          className="w-full h-32 object-cover rounded-lg border border-zinc-700"
+                          controls
+                        />
+                      ) : (
+                        <a href={m.blobUrl} target="_blank" rel="noopener noreferrer" className="block">
+                          <div className="w-full h-32 bg-zinc-800 rounded-lg border border-zinc-700 flex items-center justify-center text-xs text-zinc-500 font-mono">
+                            {m.fileName}
+                          </div>
+                        </a>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 rounded-b-lg">
+                        <p className="text-[10px] text-zinc-300 truncate">{m.fileName}</p>
+                        <div className="flex items-center gap-2">
+                          {m.driveUrl && (
+                            <a href={m.driveUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:text-blue-300">
+                              Drive
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteMedia(m.id)}
+                        className="absolute top-1 right-1 bg-black/60 text-zinc-400 hover:text-red-400 rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-600 mb-4">No media uploaded yet.</p>
+              )}
+              <label className="inline-flex items-center gap-2 text-sm font-mono text-[#c47a4f] hover:text-[#d89a6f] cursor-pointer border border-zinc-700 rounded-lg px-4 py-2 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Upload Media
+                <input type="file" onChange={uploadMedia} className="hidden" accept="image/*,video/*" />
               </label>
             </Card>
           )}

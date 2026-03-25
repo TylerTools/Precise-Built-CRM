@@ -41,6 +41,8 @@ export async function PATCH(request: Request) {
     "inviteEmailBody",
     "stageEmailSubject",
     "stageEmailBody",
+    "driveConnected",
+    "driveRefreshToken",
   ];
 
   const data: Record<string, unknown> = {};

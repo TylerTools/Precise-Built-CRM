@@ -80,6 +80,8 @@ export async function PATCH(
       ...(body.assignedUserId !== undefined && { assignedUserId: body.assignedUserId || null }),
       ...(body.startDate !== undefined && { startDate: body.startDate ? new Date(body.startDate) : null }),
       ...(body.endDate !== undefined && { endDate: body.endDate ? new Date(body.endDate) : null }),
+      ...(body.archived !== undefined && { archived: body.archived }),
+      ...(body.archivedAt !== undefined && { archivedAt: body.archivedAt ? new Date(body.archivedAt) : null }),
     },
   });
 
@@ -95,7 +97,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const session = await getSession();
-  if (!session || session.role !== "admin") {
+  if (!session || (session.role !== "admin" && session.role !== "owner")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

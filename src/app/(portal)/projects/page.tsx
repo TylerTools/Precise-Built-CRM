@@ -14,6 +14,7 @@ interface Project {
   address: string;
   value: number | null;
   createdAt: string;
+  archived: boolean;
   contact: { name: string; phone: string; email: string };
   assignedUser: { name: string } | null;
 }
@@ -41,15 +42,12 @@ function ProjectList() {
     setActiveFilter(stageFilter);
   }, [stageFilter]);
 
-  const filtered = activeFilter
-    ? projects.filter((p) => p.stage === activeFilter)
-    : projects;
-
-  const divisions = [
-    { label: "All", key: null },
-    { label: "Sales", key: "SALES" },
-    { label: "Ops", key: "OPS" },
-  ];
+  const showArchived = activeFilter === "ARCHIVED";
+  const filtered = showArchived
+    ? projects.filter((p) => p.archived)
+    : activeFilter
+    ? projects.filter((p) => p.stage === activeFilter && !p.archived)
+    : projects.filter((p) => !p.archived);
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
@@ -74,10 +72,10 @@ function ProjectList() {
               : "border-zinc-700 text-zinc-500 hover:border-zinc-500"
           }`}
         >
-          All ({projects.length})
+          All ({projects.filter((p) => !p.archived).length})
         </button>
         {STAGES.map((s) => {
-          const count = projects.filter((p) => p.stage === s.key).length;
+          const count = projects.filter((p) => p.stage === s.key && !p.archived).length;
           return (
             <button
               key={s.key}
@@ -88,10 +86,22 @@ function ProjectList() {
                   : "border-zinc-700 text-zinc-500 hover:border-zinc-500"
               }`}
             >
-              {s.key} ({count})
+              {s.shortLabel} ({count})
             </button>
           );
         })}
+        {projects.some((p) => p.archived) && (
+          <button
+            onClick={() => setActiveFilter(activeFilter === "ARCHIVED" ? null : "ARCHIVED")}
+            className={`text-xs font-mono px-3 py-1.5 rounded-full border transition-colors ${
+              activeFilter === "ARCHIVED"
+                ? "border-red-500 bg-red-500/15 text-red-400"
+                : "border-zinc-700 text-zinc-500 hover:border-zinc-500"
+            }`}
+          >
+            Archived ({projects.filter((p) => p.archived).length})
+          </button>
+        )}
       </div>
 
       {/* Project list */}
@@ -134,7 +144,7 @@ function ProjectList() {
                             : "bg-zinc-700 text-zinc-400"
                         }`}
                       >
-                        {stage?.key || project.stage} · {stage?.shortLabel || project.stage}
+                        {stage?.shortLabel || project.stage}
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500 truncate">
