@@ -28,6 +28,8 @@ function ProjectList() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string | null>(stageFilter);
 
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
+
   useEffect(() => {
     fetch("/api/projects")
       .then((r) => r.json())
@@ -36,6 +38,12 @@ function ProjectList() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    fetch("/api/projects?archived=true")
+      .then((r) => r.json())
+      .then((data) => {
+        setArchivedProjects(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -44,10 +52,10 @@ function ProjectList() {
 
   const showArchived = activeFilter === "ARCHIVED";
   const filtered = showArchived
-    ? projects.filter((p) => p.archived)
+    ? archivedProjects
     : activeFilter
-    ? projects.filter((p) => p.stage === activeFilter && !p.archived)
-    : projects.filter((p) => !p.archived);
+    ? projects.filter((p) => p.stage === activeFilter)
+    : projects;
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
@@ -72,10 +80,10 @@ function ProjectList() {
               : "border-zinc-700 text-zinc-500 hover:border-zinc-500"
           }`}
         >
-          All ({projects.filter((p) => !p.archived).length})
+          All ({projects.length})
         </button>
         {STAGES.map((s) => {
-          const count = projects.filter((p) => p.stage === s.key && !p.archived).length;
+          const count = projects.filter((p) => p.stage === s.key).length;
           return (
             <button
               key={s.key}
@@ -90,7 +98,7 @@ function ProjectList() {
             </button>
           );
         })}
-        {projects.some((p) => p.archived) && (
+        {archivedProjects.length > 0 && (
           <button
             onClick={() => setActiveFilter(activeFilter === "ARCHIVED" ? null : "ARCHIVED")}
             className={`text-xs font-mono px-3 py-1.5 rounded-full border transition-colors ${
@@ -99,7 +107,7 @@ function ProjectList() {
                 : "border-zinc-700 text-zinc-500 hover:border-zinc-500"
             }`}
           >
-            Archived ({projects.filter((p) => p.archived).length})
+            Archived ({archivedProjects.length})
           </button>
         )}
       </div>

@@ -50,6 +50,21 @@ export async function PATCH(
 
   const body = await request.json();
 
+  // Save stage when archiving, restore when unarchiving
+  if (body.archived !== undefined) {
+    const current = await prisma.project.findUnique({
+      where: { id: params.id },
+      select: { stage: true, archivedAtStage: true },
+    });
+    if (current) {
+      if (body.archived === true) {
+        body.archivedAtStage = current.stage;
+      } else if (body.archived === false && current.archivedAtStage) {
+        body.stage = current.archivedAtStage;
+      }
+    }
+  }
+
   // Track stage changes
   if (body.stage !== undefined) {
     const current = await prisma.project.findUnique({
@@ -80,8 +95,16 @@ export async function PATCH(
       ...(body.assignedUserId !== undefined && { assignedUserId: body.assignedUserId || null }),
       ...(body.startDate !== undefined && { startDate: body.startDate ? new Date(body.startDate) : null }),
       ...(body.endDate !== undefined && { endDate: body.endDate ? new Date(body.endDate) : null }),
-      ...(body.archived !== undefined && { archived: body.archived }),
-      ...(body.archivedAt !== undefined && { archivedAt: body.archivedAt ? new Date(body.archivedAt) : null }),
+      ...(body.archived !== undefined && body.archived === true && {
+        archived: true,
+        archivedAt: new Date(),
+        archivedAtStage: body.archivedAtStage || null,
+      }),
+      ...(body.archived !== undefined && body.archived === false && {
+        archived: false,
+        archivedAt: null,
+        archivedAtStage: null,
+      }),
     },
   });
 

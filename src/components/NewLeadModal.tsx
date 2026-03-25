@@ -13,6 +13,9 @@ export default function NewLeadModal({ open, onClose }: NewLeadModalProps) {
     phone: "",
     email: "",
     source: "other",
+    jobType: "",
+    address: "",
+    value: "",
     notes: "",
   });
   const [saving, setSaving] = useState(false);
@@ -21,15 +24,38 @@ export default function NewLeadModal({ open, onClose }: NewLeadModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || !form.address.trim()) return;
     setSaving(true);
-    const res = await fetch("/api/contacts", {
+
+    // Create contact
+    const contactRes = await fetch("/api/contacts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        name: form.name,
+        phone: form.phone,
+        email: form.email,
+        source: form.source,
+        notes: form.notes,
+      }),
     });
-    if (res.ok) {
-      setForm({ name: "", phone: "", email: "", source: "other", notes: "" });
+
+    if (contactRes.ok) {
+      const contact = await contactRes.json();
+      // Create project linked to contact
+      if (form.jobType || form.address) {
+        await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contactId: contact.id,
+            jobType: form.jobType || "General",
+            address: form.address,
+            value: form.value || null,
+          }),
+        });
+      }
+      setForm({ name: "", phone: "", email: "", source: "other", jobType: "", address: "", value: "", notes: "" });
       onClose();
     }
     setSaving(false);
@@ -43,7 +69,7 @@ export default function NewLeadModal({ open, onClose }: NewLeadModalProps) {
       />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md p-6 shadow-2xl"
+          className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-5">
@@ -121,6 +147,48 @@ export default function NewLeadModal({ open, onClose }: NewLeadModalProps) {
             </div>
             <div>
               <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+                Project Type
+              </label>
+              <input
+                type="text"
+                value={form.jobType}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setForm({ ...form, jobType: e.target.value })
+                }
+                placeholder="Kitchen Remodel, Bathroom, etc."
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+                Project Address *
+              </label>
+              <input
+                type="text"
+                value={form.address}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setForm({ ...form, address: e.target.value })
+                }
+                placeholder="123 Main St, Sarasota FL"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+                Estimated Value
+              </label>
+              <input
+                type="number"
+                value={form.value}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setForm({ ...form, value: e.target.value })
+                }
+                placeholder="25000"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
                 Notes
               </label>
               <textarea
@@ -134,7 +202,7 @@ export default function NewLeadModal({ open, onClose }: NewLeadModalProps) {
             </div>
             <button
               type="submit"
-              disabled={saving || !form.name.trim()}
+              disabled={saving || !form.name.trim() || !form.address.trim()}
               className="w-full bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-syne font-semibold px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50"
             >
               {saving ? "Saving..." : "Add Lead"}

@@ -5,13 +5,17 @@ import { getOrCreateClientFolder } from "@/lib/google-drive";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const showArchived = searchParams.get("archived") === "true";
+
   const projects = await prisma.project.findMany({
+    where: { archived: showArchived },
     include: {
       contact: { select: { name: true, phone: true, email: true } },
       assignedUser: { select: { name: true } },
