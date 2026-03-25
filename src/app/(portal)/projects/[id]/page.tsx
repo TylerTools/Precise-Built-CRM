@@ -1,70 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { STAGES, STAGE_MAP, getNextStage, getPrevStage } from "@/lib/stages";
+import { STAGES, STAGE_MAP, getNextStage } from "@/lib/stages";
 import type { StageKey } from "@/lib/stages";
+import MeetingScheduler from "@/components/MeetingScheduler";
 
 // ─── Types ───────────────────────────────────────────────────
-interface TeamUser {
-  id: string;
-  name: string;
-}
-
-interface Task {
-  id: string;
-  label: string;
-  completed: boolean;
-  isChecklist: boolean;
-  stage: string | null;
-  sortOrder: number;
-  assignedUserId: string | null;
-  assignedUser: TeamUser | null;
-  dueDate: string | null;
-  priority: string;
-}
-
-interface FileRecord {
-  id: string;
-  filename: string;
-  url: string;
-  uploadedAt: string;
-}
-
-interface ChangeOrder {
-  id: string;
-  description: string;
-  amount: number;
-  status: string;
-  createdAt: string;
-}
-
-interface PurchaseOrder {
-  id: string;
-  vendor: string;
-  description: string;
-  amount: number;
-  status: string;
-  createdAt: string;
-}
-
-interface TimeEntry {
-  id: string;
-  date: string;
-  hours: number;
-  note: string;
-  user: { name: string };
-}
-
-interface MediaRecord {
-  id: string;
-  fileName: string;
-  fileType: string;
-  blobUrl: string;
-  driveUrl: string | null;
-  createdAt: string;
-}
-
 interface Project {
   id: string;
   jobType: string;
@@ -81,75 +23,30 @@ interface Project {
   createdAt: string;
   contact: { id: string; name: string; phone: string; email: string };
   assignedUser: { id: string; name: string; email: string } | null;
-  tasks: Task[];
-  files: FileRecord[];
-  changeOrders: ChangeOrder[];
-  purchaseOrders: PurchaseOrder[];
-  timeEntries: TimeEntry[];
 }
 
-type Tab = "overview" | "tasks" | "financials" | "files" | "media";
+interface StageDataRecord {
+  id: string;
+  stage: string;
+  data: Record<string, unknown>;
+  completedAt: string | null;
+}
 
-// ─── Inline Edit Field ──────────────────────────────────────
-function InlineField({
-  label,
-  value,
-  onSave,
-  type = "text",
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  onSave: (v: string) => void;
-  type?: string;
-  mono?: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
+interface MeetingRecord {
+  id: string;
+  stage: string;
+  title: string;
+  scheduledAt: string;
+  notes: string | null;
+  googleEventUrl: string | null;
+}
 
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
-
-  useEffect(() => {
-    if (editing) inputRef.current?.focus();
-  }, [editing]);
-
-  const commit = () => {
-    setEditing(false);
-    if (draft !== value) onSave(draft);
-  };
-
-  return (
-    <div>
-      <span className="text-zinc-600 text-xs font-mono">{label}</span>
-      {editing ? (
-        <input
-          ref={inputRef}
-          type={type}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit();
-            if (e.key === "Escape") {
-              setDraft(value);
-              setEditing(false);
-            }
-          }}
-          className={`w-full bg-zinc-800 border border-[#c47a4f]/50 rounded px-2 py-1 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#c47a4f] ${mono ? "font-mono" : ""}`}
-        />
-      ) : (
-        <p
-          onClick={() => setEditing(true)}
-          className={`text-zinc-300 cursor-pointer hover:text-white hover:bg-zinc-800/50 rounded px-1 -mx-1 transition-colors ${mono ? "font-mono" : ""}`}
-        >
-          {value || <span className="text-zinc-600 italic">Click to edit</span>}
-        </p>
-      )}
-    </div>
-  );
+interface FollowUpRecord {
+  id: string;
+  attemptNumber: number;
+  date: string | null;
+  notes: string | null;
+  responded: boolean;
 }
 
 // ─── Component ───────────────────────────────────────────────
@@ -158,23 +55,14 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [media, setMedia] = useState<MediaRecord[]>([]);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
-
-  // Task form state
-  const [newTaskLabel, setNewTaskLabel] = useState("");
-  const [newTaskAssignee, setNewTaskAssignee] = useState("");
-  const [newTaskDue, setNewTaskDue] = useState("");
-  const [newTaskPriority, setNewTaskPriority] = useState("medium");
-
-  // Financial form states
-  const [coForm, setCoForm] = useState({ description: "", amount: "", status: "pending" });
-  const [poForm, setPoForm] = useState({ vendor: "", description: "", amount: "", status: "pending" });
-  const [teForm, setTeForm] = useState({ date: "", hours: "", note: "" });
+  const [stageDataMap, setStageDataMap] = useState<Record<string, StageDataRecord>>({});
+  const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
+  const [followUps, setFollowUps] = useState<FollowUpRecord[]>([]);
+  const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [meetingStage, setMeetingStage] = useState("");
+  const [meetingTitle, setMeetingTitle] = useState("");
+  const [saving, setSaving] = useState<string | null>(null);
 
   const fetchProject = useCallback(() => {
     fetch(`/api/projects/${params.id}`)
@@ -186,36 +74,98 @@ export default function ProjectDetailPage() {
         setProject(data);
         setLoading(false);
       })
-      .catch(() => {
-        router.push("/projects");
-      });
+      .catch(() => router.push("/projects"));
   }, [params.id, router]);
 
-  const fetchMedia = useCallback(() => {
-    fetch(`/api/projects/${params.id}/media`)
+  const fetchStageData = useCallback(() => {
+    fetch(`/api/projects/${params.id}/stage-data`)
       .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setMedia(data);
+      .then((data: StageDataRecord[]) => {
+        const map: Record<string, StageDataRecord> = {};
+        if (Array.isArray(data)) data.forEach((sd) => (map[sd.stage] = sd));
+        setStageDataMap(map);
       })
+      .catch(() => {});
+  }, [params.id]);
+
+  const fetchMeetings = useCallback(() => {
+    fetch(`/api/projects/${params.id}/meetings`)
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setMeetings(data); })
+      .catch(() => {});
+  }, [params.id]);
+
+  const fetchFollowUps = useCallback(() => {
+    fetch(`/api/projects/${params.id}/follow-ups`)
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setFollowUps(data); })
       .catch(() => {});
   }, [params.id]);
 
   useEffect(() => {
     fetchProject();
-    fetchMedia();
-    fetch("/api/users")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setTeamUsers(data);
-      })
-      .catch(() => {});
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.user?.role) setUserRole(data.user.role);
-      })
-      .catch(() => {});
-  }, [fetchProject, fetchMedia]);
+    fetchStageData();
+    fetchMeetings();
+    fetchFollowUps();
+  }, [fetchProject, fetchStageData, fetchMeetings, fetchFollowUps]);
+
+  const saveStageData = async (stage: string, data: Record<string, unknown>, completed?: boolean) => {
+    setSaving(stage);
+    await fetch(`/api/projects/${params.id}/stage-data`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stage,
+        data,
+        completedAt: completed ? new Date().toISOString() : undefined,
+      }),
+    });
+    fetchStageData();
+    setSaving(null);
+  };
+
+  const advanceStage = async (nextStage: string) => {
+    await fetch(`/api/projects/${params.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stage: nextStage }),
+    });
+    fetchProject();
+    fetchStageData();
+  };
+
+  const archiveProject = async () => {
+    await fetch(`/api/projects/${params.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: true }),
+    });
+    router.push("/projects");
+  };
+
+  const saveFollowUp = async (fu: { id?: string; attemptNumber: number; date: string; notes: string; responded: boolean }) => {
+    await fetch(`/api/projects/${params.id}/follow-ups`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fu),
+    });
+    fetchFollowUps();
+  };
+
+  const openMeetingScheduler = (stage: string, title: string) => {
+    setMeetingStage(stage);
+    setMeetingTitle(title);
+    setShowMeetingModal(true);
+  };
+
+  const toggleStage = (stage: string) => {
+    setExpandedStages((prev) => {
+      const next = new Set(prev);
+      if (next.has(stage)) next.delete(stage);
+      else next.add(stage);
+      return next;
+    });
+  };
 
   if (loading || !project) {
     return (
@@ -225,1037 +175,634 @@ export default function ProjectDetailPage() {
     );
   }
 
+  const currentStageIdx = STAGES.findIndex((s) => s.key === project.stage);
+  const completedStages = STAGES.slice(0, currentStageIdx);
   const currentStage = STAGE_MAP[project.stage as StageKey];
   const nextStageKey = getNextStage(project.stage as StageKey);
-  const prevStageKey = getPrevStage(project.stage as StageKey);
-  const customTasks = project.tasks.filter((t) => !t.isChecklist);
 
-  // ── Handlers ──────────────────────────────────────────────
-  const patchProject = async (data: Record<string, unknown>) => {
-    setSaving(true);
-    await fetch(`/api/projects/${params.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    setSaving(false);
-    fetchProject();
-  };
-
-  const patchContact = async (data: Record<string, unknown>) => {
-    await fetch("/api/contacts", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: project.contact.id, ...data }),
-    });
-    fetchProject();
-  };
-
-  const advanceStage = async () => {
-    if (!nextStageKey) return;
-    await patchProject({ stage: nextStageKey });
-  };
-
-  const revertStage = async () => {
-    if (!prevStageKey) return;
-    await patchProject({ stage: prevStageKey });
-  };
-
-  const toggleTask = async (taskId: string, completed: boolean) => {
-    await fetch("/api/tasks", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: taskId, completed: !completed }),
-    });
-    fetchProject();
-  };
-
-  const addTask = async () => {
-    if (!newTaskLabel.trim()) return;
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        projectId: params.id,
-        label: newTaskLabel,
-        assignedUserId: newTaskAssignee || undefined,
-        dueDate: newTaskDue || undefined,
-        priority: newTaskPriority,
-      }),
-    });
-    setNewTaskLabel("");
-    setNewTaskAssignee("");
-    setNewTaskDue("");
-    setNewTaskPriority("medium");
-    fetchProject();
-  };
-
-  const deleteTask = async (taskId: string) => {
-    await fetch("/api/tasks", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: taskId }),
-    });
-    fetchProject();
-  };
-
-  const uploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("projectId", params.id as string);
-    await fetch("/api/upload", { method: "POST", body: formData });
-    fetchProject();
-    e.target.value = "";
-  };
-
-  // Financial handlers
-  const addChangeOrder = async () => {
-    if (!coForm.description || !coForm.amount) return;
-    await fetch("/api/change-orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId: params.id, ...coForm }),
-    });
-    setCoForm({ description: "", amount: "", status: "pending" });
-    fetchProject();
-  };
-
-  const deleteChangeOrder = async (id: string) => {
-    await fetch("/api/change-orders", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    fetchProject();
-  };
-
-  const addPurchaseOrder = async () => {
-    if (!poForm.vendor || !poForm.description || !poForm.amount) return;
-    await fetch("/api/purchase-orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId: params.id, ...poForm }),
-    });
-    setPoForm({ vendor: "", description: "", amount: "", status: "pending" });
-    fetchProject();
-  };
-
-  const deletePurchaseOrder = async (id: string) => {
-    await fetch("/api/purchase-orders", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    fetchProject();
-  };
-
-  const addTimeEntry = async () => {
-    if (!teForm.date || !teForm.hours) return;
-    await fetch("/api/time-entries", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId: params.id, ...teForm }),
-    });
-    setTeForm({ date: "", hours: "", note: "" });
-    fetchProject();
-  };
-
-  const deleteTimeEntry = async (id: string) => {
-    await fetch("/api/time-entries", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    fetchProject();
-  };
-
-  // Split contact name for first/last
-  const nameParts = project.contact.name.split(" ");
-  const firstName = nameParts[0] || "";
-  const lastName = nameParts.slice(1).join(" ") || "";
-
-  // Financial totals
-  const approvedCOs = (project.changeOrders || []).filter((co) => co.status === "approved");
-  const coTotal = approvedCOs.reduce((s, co) => s + co.amount, 0);
-  const poTotal = (project.purchaseOrders || []).reduce((s, po) => s + po.amount, 0);
-  const hoursTotal = (project.timeEntries || []).reduce((s, te) => s + te.hours, 0);
-
-  // ── Tabs ──────────────────────────────────────────────────
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "overview", label: "Overview" },
-    { key: "tasks", label: "Tasks" },
-    { key: "financials", label: "Financials" },
-    { key: "files", label: "Files" },
-    { key: "media", label: "Media" },
-  ];
-
-  const uploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    await fetch(`/api/projects/${params.id}/media`, { method: "POST", body: formData });
-    fetchMedia();
-    e.target.value = "";
-  };
-
-  const deleteMedia = async (mediaId: string) => {
-    await fetch(`/api/projects/${params.id}/media/${mediaId}`, { method: "DELETE" });
-    fetchMedia();
-  };
-
-  const toggleArchive = async () => {
-    const newArchived = !project.archived;
-    await patchProject({
-      archived: newArchived,
-      ...(newArchived ? { archivedAt: new Date().toISOString() } : { archivedAt: null }),
-    });
-    setShowArchiveModal(false);
-  };
-
-  const canArchive = userRole === "admin" || userRole === "owner";
+  // Get stage-specific data helper
+  const sd = (stage: string) => (stageDataMap[stage]?.data || {}) as Record<string, unknown>;
+  const stageMeetings = (stage: string) => meetings.filter((m) => m.stage === stage);
 
   return (
-    <div className="p-4 lg:p-8 max-w-6xl mx-auto">
-      {/* Back link */}
-      <button
-        onClick={() => router.push("/projects")}
-        className="text-xs font-mono text-zinc-500 hover:text-[#c47a4f] transition-colors mb-4 inline-block"
-      >
-        &larr; Projects
-      </button>
-
-      {/* Current Stage Name — prominent */}
-      <div className="mb-2">
-        <span className="text-[#c47a4f] font-syne font-bold text-lg">
-          {currentStage?.label || project.stage}
-        </span>
-        <span className="text-zinc-600 font-mono text-xs ml-3">
-          {currentStage?.division === "SALES" ? "Sales" : "Operations"}
-        </span>
-        {saving && <span className="text-zinc-600 font-mono text-xs ml-3">Saving...</span>}
-      </div>
-
-      {/* Stage Progress Bar — 10 stages */}
-      <div className="flex gap-1 mb-3">
-        {STAGES.map((s) => {
-          const stageIdx = STAGES.findIndex((st) => st.key === project.stage);
-          const thisIdx = STAGES.findIndex((st) => st.key === s.key);
-          const isPast = thisIdx < stageIdx;
-          const isCurrent = s.key === project.stage;
-          return (
-            <div
-              key={s.key}
-              className="flex-1 flex flex-col items-center gap-1"
-              title={s.label}
-            >
-              <div
-                className={`w-full h-2 rounded-full transition-colors ${
-                  isCurrent
-                    ? "bg-[#c47a4f]"
-                    : isPast
-                    ? "bg-[#c47a4f]/40"
-                    : "bg-zinc-800"
-                }`}
-              />
-              <span
-                className={`text-[9px] font-mono ${
-                  isCurrent ? "text-[#c47a4f] font-bold" : "text-zinc-600"
-                } hidden sm:block truncate text-center w-full`}
-              >
-                {s.shortLabel}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Advance / Revert buttons */}
+    <div className="p-4 lg:p-8 max-w-7xl mx-auto">
+      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        {prevStageKey && (
-          <button
-            onClick={revertStage}
-            className="text-xs font-mono px-4 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-white transition-colors"
-          >
-            &larr; Revert to {STAGE_MAP[prevStageKey]?.shortLabel}
-          </button>
-        )}
-        {nextStageKey && (
-          <button
-            onClick={advanceStage}
-            className="text-xs font-mono px-4 py-2 rounded-lg bg-[#c47a4f] text-white hover:bg-[#b06a3f] transition-colors"
-          >
-            Advance to {STAGE_MAP[nextStageKey]?.shortLabel} &rarr;
-          </button>
-        )}
-        {canArchive && (
-          <button
-            onClick={() => setShowArchiveModal(true)}
-            className={`text-xs font-mono px-4 py-2 rounded-lg border transition-colors ml-auto ${
-              project.archived
-                ? "border-emerald-700 text-emerald-400 hover:border-emerald-500"
-                : "border-zinc-700 text-zinc-500 hover:border-red-500 hover:text-red-400"
-            }`}
-          >
-            {project.archived ? "Restore Project" : "Archive Project"}
-          </button>
-        )}
-      </div>
-
-      {/* Archive confirmation modal */}
-      {showArchiveModal && (
-        <>
-          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setShowArchiveModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-[#0e0e0f] border border-zinc-800 rounded-xl p-6 w-full max-w-sm shadow-2xl">
-              <h2 className="text-lg font-syne font-bold text-white mb-3">
-                {project.archived ? "Restore Project?" : "Archive Project?"}
-              </h2>
-              <p className="text-sm text-zinc-400 mb-6">
-                {project.archived
-                  ? "This project will be visible in active views again."
-                  : "This project will be hidden from active views. You can restore it later from the Archived tab."}
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setShowArchiveModal(false)}
-                  className="text-sm font-mono text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={toggleArchive}
-                  className={`text-sm font-semibold px-5 py-2 rounded-lg transition-colors ${
-                    project.archived
-                      ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-                      : "bg-red-600 hover:bg-red-500 text-white"
-                  }`}
-                >
-                  {project.archived ? "Restore" : "Archive"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Archived banner */}
-      {project.archived && (
-        <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400 font-mono">
-          This project is archived.
-        </div>
-      )}
-
-      {/* Project Header */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+        <button onClick={() => router.push("/projects")} className="text-zinc-500 hover:text-white transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
         <div>
-          <h1 className="text-2xl font-syne font-bold text-white mb-1">
-            {project.contact.name}
+          <h1 className="text-xl font-syne font-bold text-white">
+            {project.contact.name} — {project.jobType}
           </h1>
-          <p className="text-sm text-zinc-500">
-            {project.jobType}
-            {project.address ? ` · ${project.address}` : ""}
-          </p>
+          <p className="text-xs text-zinc-500 font-mono">{project.address}</p>
         </div>
+        {currentStage && (
+          <span className={`ml-auto text-xs font-mono px-3 py-1 rounded-full ${currentStage.color}/20 ${currentStage.textColor}`}>
+            {currentStage.shortLabel}
+          </span>
+        )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-zinc-800 overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              activeTab === tab.key
-                ? "border-[#c47a4f] text-[#c47a4f]"
-                : "border-transparent text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main content — 2/3 width */}
-        <div className="lg:col-span-2 space-y-6">
-          {activeTab === "overview" && (
-            <>
-              {/* Editable Project Fields */}
-              <Card title="Project Details">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <InlineField
-                    label="Project Name"
-                    value={project.scope || ""}
-                    onSave={(v) => patchProject({ scope: v })}
-                  />
-                  <InlineField
-                    label="Job Type"
-                    value={project.jobType}
-                    onSave={(v) => patchProject({ jobType: v })}
-                  />
-                  <InlineField
-                    label="Estimated Value"
-                    value={project.value?.toString() || ""}
-                    onSave={(v) => patchProject({ value: v })}
-                    type="number"
-                    mono
-                  />
-                  <InlineField
-                    label="Address"
-                    value={project.address}
-                    onSave={(v) => patchProject({ address: v })}
-                  />
-                </div>
-              </Card>
-
-              {/* Notes */}
-              <Card title="Internal Notes">
-                <InlineTextarea
-                  value={project.notes}
-                  onSave={(v) => patchProject({ notes: v })}
-                />
-              </Card>
-
-              {/* Contact Info */}
-              <Card title="Contact">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <InlineField
-                    label="First Name"
-                    value={firstName}
-                    onSave={(v) =>
-                      patchContact({ name: `${v} ${lastName}`.trim() })
-                    }
-                  />
-                  <InlineField
-                    label="Last Name"
-                    value={lastName}
-                    onSave={(v) =>
-                      patchContact({ name: `${firstName} ${v}`.trim() })
-                    }
-                  />
-                  <InlineField
-                    label="Phone"
-                    value={project.contact.phone}
-                    onSave={(v) => patchContact({ phone: v })}
-                    type="tel"
-                    mono
-                  />
-                  <InlineField
-                    label="Email"
-                    value={project.contact.email}
-                    onSave={(v) => patchContact({ email: v })}
-                    type="email"
-                  />
-                </div>
-              </Card>
-            </>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+        {/* Left — Phase Timeline */}
+        <div className="space-y-4">
+          {/* Current active stage */}
+          {currentStage && (
+            <StageCard
+              stage={currentStage}
+              active
+              expanded
+              project={project}
+              data={sd(project.stage)}
+              meetings={stageMeetings(project.stage)}
+              followUps={followUps}
+              saving={saving === project.stage}
+              onSaveData={(d) => saveStageData(project.stage, d)}
+              onAdvance={nextStageKey ? () => advanceStage(nextStageKey) : undefined}
+              onArchive={archiveProject}
+              onScheduleMeeting={(title) => openMeetingScheduler(project.stage, title)}
+              onSaveFollowUp={saveFollowUp}
+            />
           )}
 
-          {activeTab === "tasks" && (
-            <Card title="Tasks">
-              {/* Task list */}
-              <div className="space-y-2 mb-6">
-                {customTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-3 group bg-zinc-800/30 rounded-lg px-3 py-2"
-                  >
-                    <button
-                      onClick={() => toggleTask(task.id, task.completed)}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                        task.completed
-                          ? "bg-[#c47a4f] border-[#c47a4f]"
-                          : "border-zinc-600 hover:border-[#c47a4f]"
-                      }`}
-                    >
-                      {task.completed && (
-                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-sm ${task.completed ? "line-through text-zinc-600" : "text-zinc-300"}`}>
-                        {task.label}
-                      </span>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        {task.assignedUser && (
-                          <span className="text-[10px] font-mono text-zinc-500">
-                            {task.assignedUser.name}
-                          </span>
-                        )}
-                        {task.dueDate && (
-                          <span className="text-[10px] font-mono text-zinc-500">
-                            Due {new Date(task.dueDate).toLocaleDateString()}
-                          </span>
-                        )}
-                        <span className={`text-[10px] font-mono ${
-                          task.priority === "high" ? "text-red-400" :
-                          task.priority === "low" ? "text-zinc-600" :
-                          "text-zinc-500"
-                        }`}>
-                          {task.priority}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => deleteTask(task.id)}
-                      className="text-zinc-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-mono"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-                {customTasks.length === 0 && (
-                  <p className="text-sm text-zinc-600 py-2">No tasks yet.</p>
-                )}
-              </div>
+          {/* Completed stages — reverse order (most recent first) */}
+          {[...completedStages].reverse().map((s) => {
+            const isExpanded = expandedStages.has(s.key);
+            return (
+              <StageCard
+                key={s.key}
+                stage={s}
+                active={false}
+                expanded={isExpanded}
+                project={project}
+                data={sd(s.key)}
+                meetings={stageMeetings(s.key)}
+                followUps={s.key === "S4" ? followUps : []}
+                saving={saving === s.key}
+                onSaveData={(d) => saveStageData(s.key, d)}
+                onToggle={() => toggleStage(s.key)}
+                onScheduleMeeting={(title) => openMeetingScheduler(s.key, title)}
+                onSaveFollowUp={saveFollowUp}
+              />
+            );
+          })}
+        </div>
 
-              {/* Add task form */}
-              <div className="border-t border-zinc-800 pt-4 space-y-3">
-                <p className="text-xs font-mono text-zinc-500 uppercase tracking-wider">Add Task</p>
-                <input
-                  type="text"
-                  value={newTaskLabel}
-                  onChange={(e) => setNewTaskLabel(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addTask()}
-                  placeholder="Task title..."
-                  className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                />
-                <div className="grid grid-cols-3 gap-2">
-                  <select
-                    value={newTaskAssignee}
-                    onChange={(e) => setNewTaskAssignee(e.target.value)}
-                    className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                  >
-                    <option value="">Assignee...</option>
-                    {teamUsers.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="date"
-                    value={newTaskDue}
-                    onChange={(e) => setNewTaskDue(e.target.value)}
-                    className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                  />
-                  <select
-                    value={newTaskPriority}
-                    onChange={(e) => setNewTaskPriority(e.target.value)}
-                    className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </div>
-                <button
-                  onClick={addTask}
-                  className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-                >
-                  Add Task
-                </button>
-              </div>
-            </Card>
-          )}
-
-          {activeTab === "financials" && (
-            <>
-              {/* Change Orders */}
-              <Card
-                title="Change Orders"
-                action={
-                  approvedCOs.length > 0 ? (
-                    <span className="text-xs font-mono text-green-400">
-                      Total: ${coTotal.toLocaleString()}
-                    </span>
-                  ) : undefined
-                }
-              >
-                {(project.changeOrders || []).length > 0 && (
-                  <div className="space-y-2 mb-4">
-                    {project.changeOrders.map((co) => (
-                      <div key={co.id} className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3 group">
-                        <div>
-                          <p className="text-sm text-zinc-300">{co.description}</p>
-                          <p className="text-xs text-zinc-600 font-mono">
-                            {co.status} · {new Date(co.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`font-mono text-sm ${
-                            co.status === "approved" ? "text-green-400" :
-                            co.status === "rejected" ? "text-red-400" :
-                            "text-zinc-400"
-                          }`}>
-                            ${co.amount.toLocaleString()}
-                          </span>
-                          <button
-                            onClick={() => deleteChangeOrder(co.id)}
-                            className="text-zinc-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-mono"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {/* Add CO form */}
-                <div className="border-t border-zinc-800 pt-3 space-y-2">
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
-                      placeholder="Description"
-                      value={coForm.description}
-                      onChange={(e) => setCoForm({ ...coForm, description: e.target.value })}
-                      className="col-span-2 bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Amount"
-                      value={coForm.amount}
-                      onChange={(e) => setCoForm({ ...coForm, amount: e.target.value })}
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <select
-                      value={coForm.status}
-                      onChange={(e) => setCoForm({ ...coForm, status: e.target.value })}
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                    <button onClick={addChangeOrder} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-                      Add CO
-                    </button>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Purchase Orders */}
-              <Card
-                title="Purchase Orders"
-                action={
-                  (project.purchaseOrders || []).length > 0 ? (
-                    <span className="text-xs font-mono text-zinc-400">
-                      Total: ${poTotal.toLocaleString()}
-                    </span>
-                  ) : undefined
-                }
-              >
-                {(project.purchaseOrders || []).length > 0 && (
-                  <div className="space-y-2 mb-4">
-                    {project.purchaseOrders.map((po) => (
-                      <div key={po.id} className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3 group">
-                        <div>
-                          <p className="text-sm text-zinc-300">{po.description}</p>
-                          <p className="text-xs text-zinc-600 font-mono">
-                            {po.vendor} · {po.status} · {new Date(po.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-sm text-zinc-400">${po.amount.toLocaleString()}</span>
-                          <button
-                            onClick={() => deletePurchaseOrder(po.id)}
-                            className="text-zinc-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-mono"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {/* Add PO form */}
-                <div className="border-t border-zinc-800 pt-3 space-y-2">
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
-                      placeholder="Vendor"
-                      value={poForm.vendor}
-                      onChange={(e) => setPoForm({ ...poForm, vendor: e.target.value })}
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    />
-                    <input
-                      placeholder="Description"
-                      value={poForm.description}
-                      onChange={(e) => setPoForm({ ...poForm, description: e.target.value })}
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Amount"
-                      value={poForm.amount}
-                      onChange={(e) => setPoForm({ ...poForm, amount: e.target.value })}
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <select
-                      value={poForm.status}
-                      onChange={(e) => setPoForm({ ...poForm, status: e.target.value })}
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="ordered">Ordered</option>
-                      <option value="received">Received</option>
-                    </select>
-                    <button onClick={addPurchaseOrder} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-                      Add PO
-                    </button>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Time Entries */}
-              <Card
-                title="Time Log"
-                action={
-                  hoursTotal > 0 ? (
-                    <span className="text-xs font-mono text-zinc-400">
-                      Total: {hoursTotal}h
-                    </span>
-                  ) : undefined
-                }
-              >
-                {(project.timeEntries || []).length > 0 && (
-                  <div className="space-y-2 mb-4">
-                    {project.timeEntries.map((te) => (
-                      <div key={te.id} className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3 group">
-                        <div>
-                          <p className="text-sm text-zinc-300">{te.user.name}</p>
-                          <p className="text-xs text-zinc-600 font-mono">
-                            {new Date(te.date).toLocaleDateString()}
-                            {te.note ? ` · ${te.note}` : ""}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-sm text-zinc-400">{te.hours}h</span>
-                          <button
-                            onClick={() => deleteTimeEntry(te.id)}
-                            className="text-zinc-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-mono"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {/* Add TE form */}
-                <div className="border-t border-zinc-800 pt-3 space-y-2">
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
-                      type="date"
-                      value={teForm.date}
-                      onChange={(e) => setTeForm({ ...teForm, date: e.target.value })}
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Hours"
-                      value={teForm.hours}
-                      onChange={(e) => setTeForm({ ...teForm, hours: e.target.value })}
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    />
-                    <input
-                      placeholder="Note"
-                      value={teForm.note}
-                      onChange={(e) => setTeForm({ ...teForm, note: e.target.value })}
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                    />
-                  </div>
-                  <button onClick={addTimeEntry} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-                    Add Entry
-                  </button>
-                </div>
-              </Card>
-            </>
-          )}
-
-          {activeTab === "files" && (
-            <Card title="Photos & Files">
+        {/* Right — Project + Client Info */}
+        <div className="space-y-4">
+          <Card title="Project Info">
+            <div className="space-y-3 text-sm">
+              <InfoRow label="Type" value={project.jobType} />
+              <InfoRow label="Address" value={project.address} />
+              <InfoRow label="Value" value={project.value ? `$${project.value.toLocaleString()}` : "—"} />
+              <InfoRow label="Scope" value={project.scope || "—"} />
+              <InfoRow label="Created" value={new Date(project.createdAt).toLocaleDateString()} />
               {project.driveFolderUrl && (
-                <div className="mb-4">
-                  <a
-                    href={project.driveFolderUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm font-mono text-blue-400 hover:text-blue-300 border border-zinc-700 rounded-lg px-4 py-2 transition-colors"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M7.71 3.5L1.15 15l3.43 5.96h6.86L7.71 3.5zm1.14 0l3.71 6.45H21l-3.71-6.45H8.85zm4.57 7.95L9.71 18.4l3.43 5.96L21.57 11.45h-8.15z" />
-                    </svg>
-                    Open in Google Drive
-                  </a>
-                </div>
+                <a
+                  href={project.driveFolderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-mono"
+                >
+                  Google Drive Folder
+                </a>
               )}
-              {project.files.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-                  {project.files.map((file) => (
-                    <a
-                      key={file.id}
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block"
-                    >
-                      {file.filename.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? (
-                        <img
-                          src={file.url}
-                          alt={file.filename}
-                          className="w-full h-32 object-cover rounded-lg border border-zinc-700"
-                        />
-                      ) : (
-                        <div className="w-full h-32 bg-zinc-800 rounded-lg border border-zinc-700 flex items-center justify-center text-xs text-zinc-500 font-mono">
-                          {file.filename}
-                        </div>
-                      )}
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-zinc-600 mb-4">No files uploaded yet.</p>
-              )}
-              <label className="inline-flex items-center gap-2 text-sm font-mono text-[#c47a4f] hover:text-[#d89a6f] cursor-pointer border border-zinc-700 rounded-lg px-4 py-2 transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                Upload File
-                <input type="file" onChange={uploadFile} className="hidden" accept="image/*,.pdf,.doc,.docx" />
-              </label>
-            </Card>
-          )}
-
-          {activeTab === "media" && (
-            <Card title="Project Media">
-              {media.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-                  {media.map((m) => (
-                    <div key={m.id} className="relative group">
-                      {m.fileType === "image" ? (
-                        <a href={m.blobUrl} target="_blank" rel="noopener noreferrer">
-                          <img
-                            src={m.blobUrl}
-                            alt={m.fileName}
-                            className="w-full h-32 object-cover rounded-lg border border-zinc-700"
-                          />
-                        </a>
-                      ) : m.fileType === "video" ? (
-                        <video
-                          src={m.blobUrl}
-                          className="w-full h-32 object-cover rounded-lg border border-zinc-700"
-                          controls
-                        />
-                      ) : (
-                        <a href={m.blobUrl} target="_blank" rel="noopener noreferrer" className="block">
-                          <div className="w-full h-32 bg-zinc-800 rounded-lg border border-zinc-700 flex items-center justify-center text-xs text-zinc-500 font-mono">
-                            {m.fileName}
-                          </div>
-                        </a>
-                      )}
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 rounded-b-lg">
-                        <p className="text-[10px] text-zinc-300 truncate">{m.fileName}</p>
-                        <div className="flex items-center gap-2">
-                          {m.driveUrl && (
-                            <a href={m.driveUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:text-blue-300">
-                              Drive
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => deleteMedia(m.id)}
-                        className="absolute top-1 right-1 bg-black/60 text-zinc-400 hover:text-red-400 rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                      >
-                        &times;
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-zinc-600 mb-4">No media uploaded yet.</p>
-              )}
-              <label className="inline-flex items-center gap-2 text-sm font-mono text-[#c47a4f] hover:text-[#d89a6f] cursor-pointer border border-zinc-700 rounded-lg px-4 py-2 transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                Upload Media
-                <input type="file" onChange={uploadMedia} className="hidden" accept="image/*,video/*" />
-              </label>
-            </Card>
-          )}
-        </div>
-
-        {/* Sidebar — 1/3 width */}
-        <div className="space-y-6">
-          {/* Client Info */}
+            </div>
+          </Card>
           <Card title="Client">
             <div className="space-y-2 text-sm">
               <p className="font-semibold text-zinc-200">{project.contact.name}</p>
-              <p>
-                <a href={`tel:${project.contact.phone.replace(/\D/g, "")}`} className="text-[#c47a4f] hover:text-[#d89a6f]">
+              {project.contact.phone && (
+                <a href={`tel:${project.contact.phone}`} className="text-zinc-400 hover:text-white block text-xs font-mono">
                   {project.contact.phone}
                 </a>
-              </p>
-              <p>
-                <a href={`mailto:${project.contact.email}`} className="text-[#c47a4f] hover:text-[#d89a6f]">
+              )}
+              {project.contact.email && (
+                <a href={`mailto:${project.contact.email}`} className="text-zinc-400 hover:text-white block text-xs font-mono">
                   {project.contact.email}
                 </a>
-              </p>
+              )}
             </div>
           </Card>
-
-          {/* Project Details */}
-          <Card title="Details">
-            <div className="space-y-3 text-sm">
-              <DetailRow label="Type" value={project.jobType} />
-              {project.address && <DetailRow label="Address" value={project.address} />}
-              {project.value != null && project.value > 0 && (
-                <DetailRow label="Value" value={`$${project.value.toLocaleString()}`} />
-              )}
-              {project.assignedUser && (
-                <DetailRow label="Assigned" value={project.assignedUser.name} />
-              )}
-              {project.startDate && (
-                <DetailRow label="Start" value={new Date(project.startDate).toLocaleDateString()} />
-              )}
-              {project.endDate && (
-                <DetailRow label="End" value={new Date(project.endDate).toLocaleDateString()} />
-              )}
-              <DetailRow label="Created" value={new Date(project.createdAt).toLocaleDateString()} />
-            </div>
-          </Card>
-
-          {/* Financial Summary */}
-          {(project.value || (project.changeOrders || []).length > 0 || (project.purchaseOrders || []).length > 0) && (
-            <Card title="Financial Summary">
-              <div className="space-y-2 text-sm font-mono">
-                {project.value != null && project.value > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Contract</span>
-                    <span className="text-zinc-300">${project.value.toLocaleString()}</span>
-                  </div>
-                )}
-                {coTotal > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Change Orders</span>
-                    <span className="text-green-400">+${coTotal.toLocaleString()}</span>
-                  </div>
-                )}
-                {poTotal > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Material Cost</span>
-                    <span className="text-zinc-400">${poTotal.toLocaleString()}</span>
-                  </div>
-                )}
-                {hoursTotal > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Hours Logged</span>
-                    <span className="text-zinc-400">{hoursTotal}h</span>
-                  </div>
-                )}
-                {project.value != null && project.value > 0 && (
-                  <>
-                    <div className="border-t border-zinc-800 my-1" />
-                    <div className="flex justify-between font-semibold">
-                      <span className="text-zinc-400">Net</span>
-                      <span className="text-white">
-                        ${(project.value + coTotal - poTotal).toLocaleString()}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
+          {project.assignedUser && (
+            <Card title="Assigned To">
+              <p className="text-sm text-zinc-200">{project.assignedUser.name}</p>
             </Card>
           )}
         </div>
       </div>
+
+      <MeetingScheduler
+        open={showMeetingModal}
+        onClose={() => setShowMeetingModal(false)}
+        projectId={project.id}
+        stage={meetingStage}
+        defaultTitle={meetingTitle}
+        clientEmail={project.contact.email}
+        onCreated={fetchMeetings}
+      />
     </div>
   );
 }
 
-// ─── Sub-components ──────────────────────────────────────────
-function Card({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
+// ─── Stage Card ─────────────────────────────────────────────
+interface StageCardProps {
+  stage: { key: string; label: string; shortLabel: string; color: string; textColor: string };
+  active: boolean;
+  expanded: boolean;
+  project: Project;
+  data: Record<string, unknown>;
+  meetings: MeetingRecord[];
+  followUps: FollowUpRecord[];
+  saving: boolean;
+  onSaveData: (d: Record<string, unknown>) => void;
+  onAdvance?: () => void;
+  onArchive?: () => void;
+  onToggle?: () => void;
+  onScheduleMeeting: (title: string) => void;
+  onSaveFollowUp: (fu: { id?: string; attemptNumber: number; date: string; notes: string; responded: boolean }) => void;
+}
+
+function StageCard({
+  stage,
+  active,
+  expanded,
+  project,
+  data,
+  meetings,
+  followUps,
+  saving,
+  onSaveData,
+  onAdvance,
+  onArchive,
+  onToggle,
+  onScheduleMeeting,
+  onSaveFollowUp,
+}: StageCardProps) {
   return (
-    <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-wider">
-          {title}
-        </h2>
-        {action}
+    <div className={`rounded-xl border ${active ? "border-[#c47a4f]/50 bg-zinc-800/50" : "border-zinc-800 bg-zinc-900/50"}`}>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 p-4 text-left"
+        disabled={active}
+      >
+        {!active && (
+          <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+        {active && <span className={`w-2.5 h-2.5 rounded-full ${stage.color} shrink-0`} />}
+        <span className={`text-sm font-semibold ${active ? "text-[#c47a4f]" : "text-zinc-400"}`}>
+          {stage.shortLabel}
+        </span>
+        <span className="text-xs text-zinc-600 font-mono">{stage.label}</span>
+        {!active && (
+          <svg className={`w-4 h-4 text-zinc-600 ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4">
+          {stage.key === "S1" && (
+            <NewLeadStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} />
+          )}
+          {stage.key === "S2" && (
+            <SiteWalkStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} meetings={meetings} onScheduleMeeting={() => onScheduleMeeting("Site Walk - " + project.contact.name)} />
+          )}
+          {stage.key === "S3" && (
+            <EstimateStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} />
+          )}
+          {stage.key === "S4" && (
+            <FollowUpStageCard followUps={followUps} data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} onArchive={onArchive} onSaveFollowUp={onSaveFollowUp} />
+          )}
+          {stage.key === "S5" && (
+            <ProjectHandoffStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} meetings={meetings} onScheduleMeeting={() => onScheduleMeeting("Project Handoff - " + project.contact.name)} />
+          )}
+          {/* Ops stages — generic for now */}
+          {stage.key.startsWith("O") && (
+            <GenericStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── S1: New Lead ───────────────────────────────────────────
+function NewLeadStageCard({
+  data,
+  saving,
+  onSave,
+  onAdvance,
+}: {
+  data: Record<string, unknown>;
+  saving: boolean;
+  onSave: (d: Record<string, unknown>) => void;
+  onAdvance?: () => void;
+}) {
+  const [source, setSource] = useState((data.source as string) || "");
+  const [followUpDate, setFollowUpDate] = useState((data.followUpDate as string) || "");
+  const [followUpNotes, setFollowUpNotes] = useState((data.followUpNotes as string) || "");
+  const [followUpDone, setFollowUpDone] = useState((data.followUpDone as boolean) || false);
+
+  return (
+    <>
+      <div>
+        <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Client Source</label>
+        <select value={source} onChange={(e) => setSource(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]">
+          <option value="">Select...</option>
+          <option value="google">Google</option>
+          <option value="referral">Referral</option>
+          <option value="door_knock">Door Knock</option>
+          <option value="social">Social Media</option>
+          <option value="other">Other</option>
+        </select>
       </div>
+      <div className="border-t border-zinc-800 pt-3">
+        <p className="text-xs font-mono text-[#c47a4f] uppercase tracking-wider mb-2">Follow Up Call</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-mono text-zinc-500 block mb-1">Date</label>
+            <input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]" />
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+              <input type="checkbox" checked={followUpDone} onChange={(e) => setFollowUpDone(e.target.checked)} className="accent-[#c47a4f]" />
+              Completed
+            </label>
+          </div>
+        </div>
+        <div className="mt-2">
+          <label className="text-xs font-mono text-zinc-500 block mb-1">Notes</label>
+          <textarea value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f] resize-y" />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={() => onSave({ source, followUpDate, followUpNotes, followUpDone })} disabled={saving} className="bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
+          {saving ? "Saving..." : "Save"}
+        </button>
+        {onAdvance && (
+          <button onClick={onAdvance} disabled={!followUpDone} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-30" title={!followUpDone ? "Complete follow up call first" : ""}>
+            Advance to Site Walk
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── S2: Site Walk ──────────────────────────────────────────
+function SiteWalkStageCard({
+  data,
+  saving,
+  onSave,
+  onAdvance,
+  meetings,
+  onScheduleMeeting,
+}: {
+  data: Record<string, unknown>;
+  saving: boolean;
+  onSave: (d: Record<string, unknown>) => void;
+  onAdvance?: () => void;
+  meetings: MeetingRecord[];
+  onScheduleMeeting: () => void;
+}) {
+  const [notes, setNotes] = useState((data.notes as string) || "");
+
+  return (
+    <>
+      <div className="flex items-center gap-3">
+        <button onClick={onScheduleMeeting} className="bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Schedule Site Walk
+        </button>
+      </div>
+      {meetings.length > 0 && (
+        <div className="space-y-1">
+          {meetings.map((m) => (
+            <div key={m.id} className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+              <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {m.title} — {new Date(m.scheduledAt).toLocaleString()}
+              {m.googleEventUrl && (
+                <a href={m.googleEventUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">Calendar</a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div>
+        <label className="text-xs font-mono text-zinc-500 block mb-1">Site Walk Notes</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f] resize-y" />
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={() => onSave({ notes })} disabled={saving} className="bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
+          {saving ? "Saving..." : "Save"}
+        </button>
+        {onAdvance && (
+          <button onClick={onAdvance} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            Advance to Estimate
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── S3: Estimate ───────────────────────────────────────────
+function EstimateStageCard({
+  data,
+  saving,
+  onSave,
+  onAdvance,
+}: {
+  data: Record<string, unknown>;
+  saving: boolean;
+  onSave: (d: Record<string, unknown>) => void;
+  onAdvance?: () => void;
+}) {
+  const [amount, setAmount] = useState((data.amount as string) || "");
+  const [dateSent, setDateSent] = useState((data.dateSent as string) || "");
+  const [notes, setNotes] = useState((data.notes as string) || "");
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-mono text-zinc-500 block mb-1">Estimate Amount</label>
+          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="25000" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]" />
+        </div>
+        <div>
+          <label className="text-xs font-mono text-zinc-500 block mb-1">Date Sent to Client</label>
+          <input type="date" value={dateSent} onChange={(e) => setDateSent(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]" />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-mono text-zinc-500 block mb-1">Notes</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f] resize-y" />
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={() => onSave({ amount, dateSent, notes })} disabled={saving} className="bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
+          {saving ? "Saving..." : "Save"}
+        </button>
+        {onAdvance && (
+          <button onClick={onAdvance} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            Advance to Follow Up
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── S4: Follow Up ──────────────────────────────────────────
+function FollowUpStageCard({
+  followUps,
+  data,
+  saving,
+  onSave,
+  onAdvance,
+  onArchive,
+  onSaveFollowUp,
+}: {
+  followUps: FollowUpRecord[];
+  data: Record<string, unknown>;
+  saving: boolean;
+  onSave: (d: Record<string, unknown>) => void;
+  onAdvance?: () => void;
+  onArchive?: () => void;
+  onSaveFollowUp: (fu: { id?: string; attemptNumber: number; date: string; notes: string; responded: boolean }) => void;
+}) {
+  const [attempts, setAttempts] = useState<{ id?: string; attemptNumber: number; date: string; notes: string; responded: boolean }[]>(() => {
+    if (followUps.length > 0) {
+      return followUps.map((f) => ({
+        id: f.id,
+        attemptNumber: f.attemptNumber,
+        date: f.date ? f.date.slice(0, 10) : "",
+        notes: f.notes || "",
+        responded: f.responded,
+      }));
+    }
+    return [{ attemptNumber: 1, date: "", notes: "", responded: false }];
+  });
+  const [closeNote, setCloseNote] = useState((data.closeNote as string) || "");
+
+  useEffect(() => {
+    if (followUps.length > 0) {
+      setAttempts(
+        followUps.map((f) => ({
+          id: f.id,
+          attemptNumber: f.attemptNumber,
+          date: f.date ? f.date.slice(0, 10) : "",
+          notes: f.notes || "",
+          responded: f.responded,
+        }))
+      );
+    }
+  }, [followUps]);
+
+  const addAttempt = () => {
+    if (attempts.length < 3) {
+      setAttempts([...attempts, { attemptNumber: attempts.length + 1, date: "", notes: "", responded: false }]);
+    }
+  };
+
+  const updateAttempt = (idx: number, field: string, value: unknown) => {
+    const next = [...attempts];
+    (next[idx] as Record<string, unknown>)[field] = value;
+    setAttempts(next);
+  };
+
+  return (
+    <>
+      {attempts.map((a, i) => (
+        <div key={i} className="border border-zinc-800 rounded-lg p-3 space-y-2">
+          <p className="text-xs font-mono text-[#c47a4f] uppercase tracking-wider">Attempt #{a.attemptNumber}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-mono text-zinc-500 block mb-1">Date</label>
+              <input type="date" value={a.date} onChange={(e) => updateAttempt(i, "date", e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]" />
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+                <input type="checkbox" checked={a.responded} onChange={(e) => updateAttempt(i, "responded", e.target.checked)} className="accent-[#c47a4f]" />
+                Responded
+              </label>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-mono text-zinc-500 block mb-1">Notes</label>
+            <textarea value={a.notes} onChange={(e) => updateAttempt(i, "notes", e.target.value)} rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f] resize-y" />
+          </div>
+          <button onClick={() => onSaveFollowUp(a)} className="text-xs text-[#c47a4f] hover:text-[#d89a6f] font-mono">
+            Save Attempt
+          </button>
+        </div>
+      ))}
+      {attempts.length < 3 && (
+        <button onClick={addAttempt} className="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors">
+          + Add Follow Up Attempt
+        </button>
+      )}
+      <div>
+        <label className="text-xs font-mono text-zinc-500 block mb-1">Close Out Note (if no response)</label>
+        <textarea value={closeNote} onChange={(e) => setCloseNote(e.target.value)} rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f] resize-y" />
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={() => onSave({ closeNote })} disabled={saving} className="bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
+          {saving ? "Saving..." : "Save"}
+        </button>
+        {onArchive && (
+          <button onClick={onArchive} className="border border-red-800 text-red-400 hover:text-red-300 text-sm px-4 py-2 rounded-lg transition-colors">
+            Archive Project
+          </button>
+        )}
+        {onAdvance && (
+          <button onClick={onAdvance} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            Advance to Project Handoff
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── S5: Project Handoff ────────────────────────────────────
+function ProjectHandoffStageCard({
+  data,
+  saving,
+  onSave,
+  onAdvance,
+  meetings,
+  onScheduleMeeting,
+}: {
+  data: Record<string, unknown>;
+  saving: boolean;
+  onSave: (d: Record<string, unknown>) => void;
+  onAdvance?: () => void;
+  meetings: MeetingRecord[];
+  onScheduleMeeting: () => void;
+}) {
+  const [contractSigned, setContractSigned] = useState((data.contractSigned as boolean) || false);
+  const [depositReceived, setDepositReceived] = useState((data.depositReceived as boolean) || false);
+  const [depositAmount, setDepositAmount] = useState((data.depositAmount as string) || "");
+  const [notes, setNotes] = useState((data.notes as string) || "");
+
+  return (
+    <>
+      <div className="flex items-center gap-3">
+        <button onClick={onScheduleMeeting} className="bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Schedule Meeting
+        </button>
+      </div>
+      {meetings.length > 0 && (
+        <div className="space-y-1">
+          {meetings.map((m) => (
+            <div key={m.id} className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+              <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {m.title} — {new Date(m.scheduledAt).toLocaleString()}
+              {m.googleEventUrl && (
+                <a href={m.googleEventUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">Calendar</a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+          <input type="checkbox" checked={contractSigned} onChange={(e) => setContractSigned(e.target.checked)} className="accent-[#c47a4f]" />
+          Signed Contract on File
+        </label>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+            <input type="checkbox" checked={depositReceived} onChange={(e) => setDepositReceived(e.target.checked)} className="accent-[#c47a4f]" />
+            Deposit Received
+          </label>
+          {depositReceived && (
+            <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="Amount" className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-300 w-32 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]" />
+          )}
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-mono text-zinc-500 block mb-1">Notes</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f] resize-y" />
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={() => onSave({ contractSigned, depositReceived, depositAmount, notes })} disabled={saving} className="bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
+          {saving ? "Saving..." : "Save"}
+        </button>
+        {onAdvance && (
+          <button onClick={onAdvance} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            Advance to Pre-Construction
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── Generic Ops Stage Card ─────────────────────────────────
+function GenericStageCard({
+  data,
+  saving,
+  onSave,
+  onAdvance,
+}: {
+  data: Record<string, unknown>;
+  saving: boolean;
+  onSave: (d: Record<string, unknown>) => void;
+  onAdvance?: () => void;
+}) {
+  const [notes, setNotes] = useState((data.notes as string) || "");
+
+  return (
+    <>
+      <div>
+        <label className="text-xs font-mono text-zinc-500 block mb-1">Notes</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#c47a4f] resize-y" />
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={() => onSave({ notes })} disabled={saving} className="bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
+          {saving ? "Saving..." : "Save"}
+        </button>
+        {onAdvance && (
+          <button onClick={onAdvance} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            Advance Stage
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── Shared Components ──────────────────────────────────────
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 p-4">
+      <h3 className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-3">{title}</h3>
       {children}
     </div>
   );
 }
 
-function InlineTextarea({
-  value,
-  onSave,
-}: {
-  value: string;
-  onSave: (v: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const [dirty, setDirty] = useState(false);
-
-  useEffect(() => {
-    setDraft(value);
-    setDirty(false);
-  }, [value]);
-
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <textarea
-        value={draft}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          setDirty(true);
-        }}
-        onBlur={() => {
-          if (dirty && draft !== value) {
-            onSave(draft);
-            setDirty(false);
-          }
-        }}
-        className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 min-h-[100px] focus:outline-none focus:ring-1 focus:ring-[#c47a4f] resize-y"
-        placeholder="Add notes about this project..."
-      />
-      {dirty && (
-        <button
-          onClick={() => {
-            onSave(draft);
-            setDirty(false);
-          }}
-          className="mt-2 text-xs font-mono text-[#c47a4f] hover:text-[#d89a6f]"
-        >
-          Save Notes
-        </button>
-      )}
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="text-zinc-600 text-xs font-mono">{label}</span>
-      <p className="text-zinc-300">{value}</p>
+    <div className="flex justify-between">
+      <span className="text-zinc-500 text-xs font-mono">{label}</span>
+      <span className="text-zinc-300 text-sm">{value}</span>
     </div>
   );
 }

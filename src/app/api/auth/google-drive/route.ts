@@ -18,7 +18,7 @@ export async function GET() {
     client_id: clientId || "",
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/drive.file",
+    scope: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar",
     access_type: "offline",
     prompt: "consent",
   });

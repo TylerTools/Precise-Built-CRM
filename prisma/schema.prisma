@@ -74,6 +74,9 @@ model Project {
   documents      Document[]
   stageHistory   StageHistory[]
   media          ProjectMedia[]
+  stageData      StageData[]
+  meetings       Meeting[]
+  followUps      FollowUp[]
 
   @@map("projects")
 }
@@ -237,4 +240,52 @@ model Settings {
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+// ─── Stage Data (JSON per stage) ────────────────────────────
+model StageData {
+  id          String    @id @default(uuid())
+  projectId   String    @map("project_id")
+  stage       String
+  data        Json
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, stage])
+  @@map("stage_data")
+}
+
+// ─── Meetings ───────────────────────────────────────────────
+model Meeting {
+  id             String   @id @default(uuid())
+  projectId      String   @map("project_id")
+  stage          String
+  title          String
+  scheduledAt    DateTime @map("scheduled_at")
+  notes          String?
+  googleEventId  String?  @map("google_event_id")
+  googleEventUrl String?  @map("google_event_url")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("meetings")
+}
+
+// ─── Follow Ups ─────────────────────────────────────────────
+model FollowUp {
+  id            String   @id @default(uuid())
+  projectId     String   @map("project_id")
+  attemptNumber Int      @map("attempt_number")
+  date          DateTime?
+  notes         String?
+  responded     Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("follow_ups")
 }
