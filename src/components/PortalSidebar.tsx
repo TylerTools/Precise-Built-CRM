@@ -130,7 +130,7 @@ export default function PortalSidebar() {
   );
 
   const sidebar = (
-    <div className="flex flex-col h-full bg-[var(--color-sidebar,#111112)] border-r border-zinc-800/50">
+    <div className="flex flex-col h-full glass-sidebar border-r border-zinc-800/50">
       {/* Logo + collapse toggle */}
       <div className="bg-black/30 px-3 py-3 flex items-center justify-between">
         <Link href="/dashboard" className={collapsed ? "mx-auto" : "flex-1 flex justify-center"}>
@@ -283,7 +283,7 @@ export default function PortalSidebar() {
       </aside>
 
       {/* Mobile header bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-zinc-950 border-b border-zinc-800/50 flex items-center justify-between px-4 h-14">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 glass-sidebar border-b border-zinc-800/50 flex items-center justify-between px-4 h-14">
         <Link href="/dashboard">
           <Image
             src="/PRECISE_BUILT logo.png"

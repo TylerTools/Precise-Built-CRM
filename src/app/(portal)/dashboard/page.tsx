@@ -111,7 +111,7 @@ export default function DashboardPage() {
       {/* Stage Pipeline Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Sales Pipeline */}
-        <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 p-5">
+        <div className="glass-card p-5">
           <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-4">
             Sales Pipeline
           </h2>
@@ -135,7 +135,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Operations Pipeline */}
-        <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 p-5">
+        <div className="glass-card p-5">
           <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-4">
             Operations
           </h2>
@@ -160,7 +160,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Projects */}
-      <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 p-5">
+      <div className="glass-card p-5">
         <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-4">
           Recent Activity
         </h2>
@@ -229,7 +229,7 @@ function KpiCard({
   sub: string;
 }) {
   return (
-    <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 p-4">
+    <div className="glass-card p-4">
       <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mb-1">
         {label}
       </p>

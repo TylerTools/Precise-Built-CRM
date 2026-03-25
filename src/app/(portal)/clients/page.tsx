@@ -109,7 +109,7 @@ export default function ClientsPage() {
           ) : filtered.length === 0 ? (
             <div className="text-sm text-zinc-600 text-center py-8">No contacts found.</div>
           ) : (
-            <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 overflow-hidden">
+            <div className="glass-card overflow-hidden">
               {filtered.map((c) => (
                 <button
                   key={c.id}
@@ -145,7 +145,7 @@ export default function ClientsPage() {
         {/* Detail panel */}
         {selected && (
           <div className="w-full lg:w-96 shrink-0">
-            <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 p-5">
+            <div className="glass-card p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-syne font-bold text-white">{selected.name}</h2>
                 <button

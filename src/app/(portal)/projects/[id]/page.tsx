@@ -507,7 +507,7 @@ export default function ProjectDetailPage() {
         <>
           <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setShowArchiveModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-[#0e0e0f] border border-zinc-800 rounded-xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="glass-modal p-6 w-full max-w-sm shadow-2xl">
               <h2 className="text-lg font-syne font-bold text-white mb-3">
                 {project.archived ? "Restore Project?" : "Archive Project?"}
               </h2>
@@ -1175,7 +1175,7 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 p-5">
+    <div className="glass-card p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-wider">
           {title}

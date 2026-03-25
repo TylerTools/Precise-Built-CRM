@@ -204,7 +204,7 @@ export default function TeamPage() {
       </div>
 
       {/* Team table */}
-      <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="glass-card overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-zinc-800">
@@ -479,7 +479,7 @@ function Modal({ onClose, title, children }: { onClose: () => void; title: strin
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-[#0e0e0f] border border-zinc-800 rounded-xl p-6 w-full max-w-md shadow-2xl">
+        <div className="glass-modal p-6 w-full max-w-md shadow-2xl">
           <h2 className="text-lg font-syne font-bold text-white mb-4">{title}</h2>
           {children}
         </div>

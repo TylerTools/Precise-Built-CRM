@@ -301,7 +301,7 @@ export default function SettingsPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[var(--color-card,#161617)] rounded-xl border border-zinc-800 p-5">
+    <div className="glass-card p-5">
       <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-4">{title}</h2>
       {children}
     </div>

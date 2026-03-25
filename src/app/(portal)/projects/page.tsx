@@ -124,7 +124,7 @@ function ProjectList() {
               <Link
                 key={project.id}
                 href={`/projects/${project.id}`}
-                className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 bg-zinc-800/50 border border-zinc-800 rounded-xl p-4 hover:bg-zinc-800 hover:border-zinc-700 transition-colors group"
+                className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 glass-card-hover p-4 group"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <span
