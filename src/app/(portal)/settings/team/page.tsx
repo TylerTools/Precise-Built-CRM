@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Avatar from "@/components/Avatar";
 
 interface TeamMember {
   id: string;
@@ -25,29 +26,6 @@ const ROLE_HIERARCHY: Record<string, number> = {
   tech: 2,
   client: 1,
 };
-
-function InitialsAvatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
-  const colors = [
-    "bg-blue-600", "bg-emerald-600", "bg-violet-600",
-    "bg-amber-600", "bg-rose-600", "bg-cyan-600", "bg-indigo-600",
-  ];
-  const colorIdx = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length;
-
-  const sizes = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-16 h-16 text-xl" };
-
-  return (
-    <div className={`${sizes[size]} ${colors[colorIdx]} rounded-full flex items-center justify-center text-white font-semibold shrink-0`}>
-      {initials}
-    </div>
-  );
-}
 
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -270,11 +248,7 @@ export default function TeamPage() {
                       onClick={() => setShowProfileModal(m)}
                       className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
                     >
-                      {m.profileImage ? (
-                        <img src={m.profileImage} alt={m.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <InitialsAvatar name={m.name} />
-                      )}
+                      <Avatar name={m.name} profileImage={m.profileImage} />
                       <span className="text-sm text-zinc-200 font-medium">{m.name}</span>
                     </button>
                   </td>
@@ -365,11 +339,7 @@ export default function TeamPage() {
           {error && <ErrorBox message={error} />}
           {/* Profile Picture Upload */}
           <div className="flex items-center gap-4 mb-4">
-            {editForm.profileImage ? (
-              <img src={editForm.profileImage} alt={editingMember.name} className="w-16 h-16 rounded-full object-cover" />
-            ) : (
-              <InitialsAvatar name={editingMember.name} size="lg" />
-            )}
+            <Avatar name={editingMember.name} profileImage={editForm.profileImage} size="lg" />
             <div>
               <label className="inline-flex items-center gap-2 text-xs font-mono text-[#c47a4f] hover:text-[#d89a6f] cursor-pointer border border-zinc-700 rounded-lg px-3 py-1.5 transition-colors">
                 Upload Photo
@@ -447,13 +417,9 @@ export default function TeamPage() {
       {showProfileModal && (
         <Modal onClose={() => setShowProfileModal(null)} title="Profile">
           <div className="flex flex-col items-center text-center mb-6">
-            {showProfileModal.profileImage ? (
-              <img src={showProfileModal.profileImage} alt={showProfileModal.name} className="w-16 h-16 rounded-full object-cover mb-3" />
-            ) : (
-              <div className="mb-3">
-                <InitialsAvatar name={showProfileModal.name} size="lg" />
-              </div>
-            )}
+            <div className="mb-3">
+              <Avatar name={showProfileModal.name} profileImage={showProfileModal.profileImage} size="lg" />
+            </div>
             <h3 className="text-lg font-syne font-bold text-white">{showProfileModal.name}</h3>
             <span className={`text-xs font-mono px-2 py-1 rounded mt-2 ${roleBadgeColor(showProfileModal.role)}`}>
               {roleLabel(showProfileModal.role)}

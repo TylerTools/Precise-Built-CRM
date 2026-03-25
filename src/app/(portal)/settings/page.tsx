@@ -9,6 +9,9 @@ interface SettingsData {
   companyAddress: string;
   logoUrl: string;
   accentColor: string;
+  mainBgColor: string;
+  cardColor: string;
+  sidebarColor: string;
   darkMode: boolean;
   inviteEmailSubject: string;
   inviteEmailBody: string;
@@ -23,6 +26,9 @@ const defaults: SettingsData = {
   companyAddress: "",
   logoUrl: "",
   accentColor: "#c47a4f",
+  mainBgColor: "#0e0e0f",
+  cardColor: "#161617",
+  sidebarColor: "#111112",
   darkMode: true,
   inviteEmailSubject: "You've been invited to Precise Built Field OS",
   inviteEmailBody: "Hi {{name}}, your account has been created. Email: {{email}} Password: {{password}} Login at: {{loginUrl}}",
@@ -35,6 +41,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [savingSection, setSavingSection] = useState<string | null>(null);
   const [savedSection, setSavedSection] = useState<string | null>(null);
+  const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const [backingUp, setBackingUp] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -46,6 +54,15 @@ export default function SettingsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    fetch("/api/settings/backup")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.lastBackup?.backedUpAt) {
+          setLastBackup(data.lastBackup.backedUpAt);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const save = async (section: string, data: Partial<SettingsData>) => {
@@ -63,6 +80,16 @@ export default function SettingsPage() {
       setTimeout(() => setSavedSection(null), 2000);
     }
     setSavingSection(null);
+  };
+
+  const handleBackupNow = async () => {
+    setBackingUp(true);
+    const res = await fetch("/api/settings/backup", { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setLastBackup(data.backedUpAt);
+    }
+    setBackingUp(false);
   };
 
   if (loading) {
@@ -133,25 +160,26 @@ export default function SettingsPage() {
       {/* Appearance */}
       <Section title="Appearance">
         <div className="space-y-4">
-          <div>
-            <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
-              Accent Color
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                value={settings.accentColor}
-                onChange={(e) => setSettings({ ...settings, accentColor: e.target.value })}
-                className="w-10 h-10 rounded-lg border border-zinc-700 bg-transparent cursor-pointer"
-              />
-              <input
-                type="text"
-                value={settings.accentColor}
-                onChange={(e) => setSettings({ ...settings, accentColor: e.target.value })}
-                className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono w-32 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-              />
-            </div>
-          </div>
+          <ColorPicker
+            label="Accent Color"
+            value={settings.accentColor}
+            onChange={(v) => setSettings({ ...settings, accentColor: v })}
+          />
+          <ColorPicker
+            label="Main Background"
+            value={settings.mainBgColor}
+            onChange={(v) => setSettings({ ...settings, mainBgColor: v })}
+          />
+          <ColorPicker
+            label="Card / Surface"
+            value={settings.cardColor}
+            onChange={(v) => setSettings({ ...settings, cardColor: v })}
+          />
+          <ColorPicker
+            label="Sidebar"
+            value={settings.sidebarColor}
+            onChange={(v) => setSettings({ ...settings, sidebarColor: v })}
+          />
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-zinc-300">Dark Mode</p>
@@ -178,6 +206,9 @@ export default function SettingsPage() {
           onClick={() =>
             save("appearance", {
               accentColor: settings.accentColor,
+              mainBgColor: settings.mainBgColor,
+              cardColor: settings.cardColor,
+              sidebarColor: settings.sidebarColor,
               darkMode: settings.darkMode,
             })
           }
@@ -238,15 +269,73 @@ export default function SettingsPage() {
           }
         />
       </Section>
+
+      {/* Backup */}
+      <Section title="Settings Backup">
+        <div className="space-y-3">
+          <p className="text-sm text-zinc-400">
+            Settings are automatically backed up every 30 days. Manual backups also save to Google Drive if connected.
+          </p>
+          {lastBackup && (
+            <p className="text-xs font-mono text-zinc-500">
+              Last backup: {new Date(lastBackup).toLocaleString()}
+            </p>
+          )}
+          {!lastBackup && (
+            <p className="text-xs font-mono text-zinc-600">No backups yet</p>
+          )}
+        </div>
+        <div className="mt-4">
+          <button
+            onClick={handleBackupNow}
+            disabled={backingUp}
+            className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {backingUp ? "Backing up..." : "Backup Now"}
+          </button>
+        </div>
+      </Section>
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-zinc-800/50 rounded-xl border border-zinc-800 p-5">
+    <div className="bg-[var(--color-card,#161617)] rounded-xl border border-zinc-800 p-5">
       <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-4">{title}</h2>
       {children}
+    </div>
+  );
+}
+
+function ColorPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+        {label}
+      </label>
+      <div className="flex items-center gap-3">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-10 h-10 rounded-lg border border-zinc-700 bg-transparent cursor-pointer"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 font-mono w-32 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
+        />
+      </div>
     </div>
   );
 }

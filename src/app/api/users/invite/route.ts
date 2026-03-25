@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession, hashPassword } from "@/lib/auth";
+import { sendInviteEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,19 @@ export async function POST(request: Request) {
     select: { id: true, name: true, email: true, role: true, createdAt: true },
   });
 
-  // TODO: Send welcome email with temp password via email service
+  // Load email template from settings
+  const settings = await prisma.settings.findUnique({ where: { id: "singleton" } });
+  const origin = request.headers.get("origin") || "https://app.precisebuilt.com";
+
+  await sendInviteEmail({
+    to: email,
+    name,
+    email,
+    password,
+    loginUrl: `${origin}/login`,
+    subject: settings?.inviteEmailSubject || undefined,
+    body: settings?.inviteEmailBody || undefined,
+  });
 
   return NextResponse.json(user, { status: 201 });
 }

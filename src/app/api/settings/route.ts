@@ -36,6 +36,9 @@ export async function PATCH(request: Request) {
     "companyAddress",
     "logoUrl",
     "accentColor",
+    "mainBgColor",
+    "cardColor",
+    "sidebarColor",
     "darkMode",
     "inviteEmailSubject",
     "inviteEmailBody",
@@ -57,6 +60,33 @@ export async function PATCH(request: Request) {
     update: data,
     create: { id: "singleton", ...data },
   });
+
+  // Auto-backup: create a SettingsBackup if last backup is older than 30 days
+  try {
+    const lastBackup = await prisma.settingsBackup.findFirst({
+      orderBy: { backedUpAt: "desc" },
+    });
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    if (!lastBackup || lastBackup.backedUpAt < thirtyDaysAgo) {
+      await prisma.settingsBackup.create({
+        data: {
+          snapshot: JSON.parse(JSON.stringify(settings)),
+          triggeredBy: "auto",
+        },
+      });
+      // Attempt Google Drive backup if connected
+      if (settings.driveConnected && settings.driveRefreshToken) {
+        try {
+          const { backupSettingsToDrive } = await import("@/lib/drive-backup");
+          await backupSettingsToDrive(settings);
+        } catch (driveErr) {
+          console.error("[Settings] Drive backup failed:", driveErr);
+        }
+      }
+    }
+  } catch (backupErr) {
+    console.error("[Settings] Auto-backup failed:", backupErr);
+  }
 
   return NextResponse.json(settings);
 }

@@ -25,7 +25,7 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <div className="min-h-screen bg-zinc-900 text-zinc-100 font-syne">
+        <div className="min-h-screen text-zinc-100 font-syne" style={{ backgroundColor: "var(--color-bg)" }}>
           {children}
         </div>
       </body>

@@ -3,8 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-bg: #0e0e0f;
+    --color-card: #161617;
+    --color-sidebar: #111112;
+    --color-accent: #c47a4f;
+  }
+
   body {
-    @apply font-syne text-zinc-100 bg-zinc-900 antialiased;
+    @apply font-syne text-zinc-100 antialiased;
+    background-color: var(--color-bg);
   }
 }
 

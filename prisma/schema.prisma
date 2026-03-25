@@ -208,6 +208,9 @@ model Settings {
   companyAddress     String   @default("") @map("company_address")
   logoUrl            String   @default("") @map("logo_url")
   accentColor        String   @default("#c47a4f") @map("accent_color")
+  mainBgColor        String   @default("#0e0e0f") @map("main_bg_color")
+  cardColor          String   @default("#161617") @map("card_color")
+  sidebarColor       String   @default("#111112") @map("sidebar_color")
   darkMode           Boolean  @default(true) @map("dark_mode")
   inviteEmailSubject String   @default("You've been invited to Precise Built Field OS") @map("invite_email_subject")
   inviteEmailBody    String   @default("Hi {{name}}, your account has been created. Email: {{email}} Password: {{password}} Login at: {{loginUrl}}") @map("invite_email_body")
@@ -219,4 +222,14 @@ model Settings {
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+// ─── Settings Backup ────────────────────────────────────────
+model SettingsBackup {
+  id          String   @id @default(uuid())
+  snapshot    Json
+  backedUpAt  DateTime @default(now()) @map("backed_up_at")
+  triggeredBy String   @default("auto") @map("triggered_by")
+
+  @@map("settings_backups")
 }
