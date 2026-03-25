@@ -216,6 +216,7 @@ model Settings {
   driveConnected     Boolean  @default(false) @map("drive_connected")
   driveRefreshToken  String?  @map("drive_refresh_token")
   bgImageUrl         String?  @map("bg_image_url")
+  bgImageOpacity     Float    @default(1.0) @map("bg_image_opacity")
   bgStyle            String   @default("solid") @map("bg_style")
   bgOverlayOpacity   Float    @default(0.75) @map("bg_overlay_opacity")
   bgBlurAmount       Int      @default(20) @map("bg_blur_amount")

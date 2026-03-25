@@ -23,6 +23,7 @@ export async function GET() {
 
 const appearanceFields = [
   "bgImageUrl",
+  "bgImageOpacity",
   "bgStyle",
   "bgOverlayOpacity",
   "bgBlurAmount",

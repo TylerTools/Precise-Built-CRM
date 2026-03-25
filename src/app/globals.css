@@ -48,7 +48,7 @@
   background-image: var(--bg-image);
   background-size: cover;
   background-position: center;
-  opacity: 0.2;
+  opacity: calc(var(--bg-image-opacity, 1) * 0.2);
   z-index: 0;
   pointer-events: none;
 }
@@ -65,6 +65,7 @@
   background-position: center;
   filter: blur(var(--bg-blur, 20px));
   transform: scale(1.1);
+  opacity: var(--bg-image-opacity, 1);
   z-index: 0;
   pointer-events: none;
 }
@@ -79,6 +80,7 @@
   background-image: var(--bg-image);
   background-size: cover;
   background-position: center;
+  opacity: var(--bg-image-opacity, 1);
   z-index: 0;
   pointer-events: none;
 }

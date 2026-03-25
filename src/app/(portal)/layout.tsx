@@ -36,18 +36,38 @@ export default function PortalLayout({
             root.style.setProperty("--glass-blur", data.glassBlur + "px");
           if (data.glassBorderOpacity !== undefined)
             root.style.setProperty("--glass-border-opacity", String(data.glassBorderOpacity));
-          if (data.bgImageUrl)
-            root.style.setProperty("--bg-image", `url(${data.bgImageUrl})`);
           if (data.bgOverlayOpacity !== undefined)
             root.style.setProperty("--bg-overlay-opacity", String(data.bgOverlayOpacity));
           if (data.bgBlurAmount !== undefined)
             root.style.setProperty("--bg-blur", data.bgBlurAmount + "px");
           if (data.accentColor)
             root.style.setProperty("--color-accent", data.accentColor);
-          root.style.setProperty("--color-bg", data.mainBgColor || "#0e0e0f");
+
+          // Image opacity
+          root.style.setProperty(
+            "--bg-image-opacity",
+            String(data.bgImageOpacity ?? 1)
+          );
+
+          const hasImage = !!data.bgImageUrl;
+          const style = data.bgStyle || "solid";
+          const useImage = hasImage && style !== "solid";
+
+          if (useImage) {
+            // Image mode: set image var, use mainBgColor as fallback behind image
+            root.style.setProperty("--bg-image", `url(${data.bgImageUrl})`);
+            root.style.setProperty("--color-bg", data.mainBgColor || "#0e0e0f");
+          } else {
+            // Solid mode: no image, just solid bg color
+            root.style.removeProperty("--bg-image");
+            root.style.setProperty("--color-bg", data.mainBgColor || "#0e0e0f");
+          }
+
           root.style.setProperty("--color-card", data.cardColor || "#161617");
           root.style.setProperty("--color-sidebar", data.sidebarColor || "#111112");
-          if (data.bgStyle) setBgStyle(data.bgStyle);
+
+          // Only use image style if we actually have an image
+          setBgStyle(useImage ? style : "solid");
         }
       })
       .catch(() => {});

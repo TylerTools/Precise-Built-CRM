@@ -15,6 +15,7 @@ interface SettingsData {
   stageEmailSubject: string;
   stageEmailBody: string;
   bgImageUrl: string;
+  bgImageOpacity: number;
   bgStyle: string;
   bgOverlayOpacity: number;
   bgBlurAmount: number;
@@ -41,6 +42,7 @@ const defaults: SettingsData = {
   stageEmailSubject: "Project stage updated",
   stageEmailBody: "Project {{project}} has moved to {{stage}}",
   bgImageUrl: "",
+  bgImageOpacity: 1.0,
   bgStyle: "solid",
   bgOverlayOpacity: 0.75,
   bgBlurAmount: 20,
@@ -55,6 +57,7 @@ const defaults: SettingsData = {
 
 const appearanceDefaults = {
   bgImageUrl: "",
+  bgImageOpacity: 1.0,
   bgStyle: "solid",
   bgOverlayOpacity: 0.75,
   bgBlurAmount: 20,
@@ -325,6 +328,17 @@ export default function SettingsPage() {
                 </div>
               </div>
 
+              {settings.bgImageUrl && settings.bgStyle !== "solid" && (
+                <Slider
+                  label="Background Image Opacity"
+                  value={settings.bgImageOpacity}
+                  min={0.1}
+                  max={1.0}
+                  step={0.05}
+                  onChange={(v: number) => setSettings({ ...settings, bgImageOpacity: v })}
+                  display={settings.bgImageOpacity.toFixed(2)}
+                />
+              )}
               {settings.bgStyle === "overlay" && (
                 <Slider
                   label="Overlay Opacity"
@@ -354,26 +368,36 @@ export default function SettingsPage() {
               <p className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-3">Live Preview</p>
               <div
                 className="relative rounded-xl overflow-hidden p-6 min-h-[120px]"
-                style={{
-                  background: settings.bgImageUrl
-                    ? `url(${settings.bgImageUrl}) center/cover`
-                    : settings.mainBgColor,
-                }}
+                style={{ background: settings.mainBgColor }}
               >
-                {settings.bgStyle === "overlay" && (
+                {settings.bgImageUrl && settings.bgStyle !== "solid" && settings.bgStyle !== "blurred" && (
                   <div
                     className="absolute inset-0"
-                    style={{ background: `rgba(14,14,15,${settings.bgOverlayOpacity})` }}
+                    style={{
+                      backgroundImage: `url(${settings.bgImageUrl})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      opacity: settings.bgImageOpacity,
+                    }}
                   />
                 )}
                 {settings.bgStyle === "blurred" && settings.bgImageUrl && (
                   <div
                     className="absolute inset-0"
                     style={{
-                      background: `url(${settings.bgImageUrl}) center/cover`,
+                      backgroundImage: `url(${settings.bgImageUrl})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
                       filter: `blur(${settings.bgBlurAmount}px)`,
                       transform: "scale(1.1)",
+                      opacity: settings.bgImageOpacity,
                     }}
+                  />
+                )}
+                {settings.bgStyle === "overlay" && (
+                  <div
+                    className="absolute inset-0 z-[1]"
+                    style={{ background: `rgba(14,14,15,${settings.bgOverlayOpacity})` }}
                   />
                 )}
                 <div
@@ -405,6 +429,7 @@ export default function SettingsPage() {
                     glassBorderOpacity: settings.glassBorderOpacity,
                     hoverAccentGlow: settings.hoverAccentGlow,
                     bgImageUrl: settings.bgImageUrl,
+                    bgImageOpacity: settings.bgImageOpacity,
                     bgStyle: settings.bgStyle,
                     bgOverlayOpacity: settings.bgOverlayOpacity,
                     bgBlurAmount: settings.bgBlurAmount,
