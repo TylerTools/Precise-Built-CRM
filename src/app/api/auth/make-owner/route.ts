@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const email = url.searchParams.get("email");
   const secret = url.searchParams.get("secret");
 
-  if (secret !== process.env.SEED_SECRET) {
+  if (secret !== process.env.JWT_SECRET) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
