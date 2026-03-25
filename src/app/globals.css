@@ -18,4 +18,75 @@
     @apply inline-flex items-center justify-center px-5 py-2.5 border border-zinc-700 text-zinc-300
            hover:bg-zinc-800 hover:border-zinc-600 transition-colors duration-200 text-sm rounded-lg;
   }
+
+  .glass-card {
+    background: rgba(255,255,255,var(--glass-opacity,0.03));
+    backdrop-filter: blur(var(--glass-blur,12px));
+    -webkit-backdrop-filter: blur(var(--glass-blur,12px));
+    border: 1px solid rgba(255,255,255,var(--glass-border-opacity,0.06));
+    border-radius: 12px;
+  }
+
+  .glass-card-hover:hover {
+    background: rgba(255,255,255,calc(var(--glass-opacity,0.03)*2));
+    border-color: rgba(196,122,79,0.3);
+  }
+}
+
+/* Background style classes */
+.bg-style-solid {
+  background: var(--color-bg);
+}
+
+.bg-style-texture {
+  position: relative;
+}
+.bg-style-texture::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.2;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bg-style-blurred {
+  position: relative;
+}
+.bg-style-blurred::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  filter: blur(var(--bg-blur, 20px));
+  transform: scale(1.1);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bg-style-overlay {
+  position: relative;
+}
+.bg-style-overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+  pointer-events: none;
+}
+.bg-style-overlay::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(14,14,15,var(--bg-overlay-opacity,0.75));
+  z-index: 1;
+  pointer-events: none;
 }

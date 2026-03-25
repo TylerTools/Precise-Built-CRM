@@ -16,10 +16,11 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   const projectId = formData.get("projectId") as string | null;
+  const uploadType = formData.get("type") as string | null;
 
-  if (!file || !projectId) {
+  if (!file) {
     return NextResponse.json(
-      { error: "file and projectId are required" },
+      { error: "file is required" },
       { status: 400 }
     );
   }
@@ -36,6 +37,18 @@ export async function POST(request: Request) {
 
   // For dev: local path. In prod: swap to cloud storage URL
   const url = `/uploads/${filename}`;
+
+  // Background image uploads don't need a project record
+  if (uploadType === "bg") {
+    return NextResponse.json({ url }, { status: 201 });
+  }
+
+  if (!projectId) {
+    return NextResponse.json(
+      { error: "projectId is required" },
+      { status: 400 }
+    );
+  }
 
   const dbFile = await prisma.file.create({
     data: { projectId, filename: file.name, url },
