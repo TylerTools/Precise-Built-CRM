@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  console.log('SEED_SECRET:', process.env.SEED_SECRET);
   const url = new URL(request.url);
   const email = url.searchParams.get("email");
   const secret = url.searchParams.get("secret");
