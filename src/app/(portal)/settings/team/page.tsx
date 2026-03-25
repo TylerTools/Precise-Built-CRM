@@ -1,24 +1,67 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface TeamMember {
   id: string;
   name: string;
   email: string;
   role: string;
+  phone: string | null;
+  profileImage: string | null;
+  displayName: string | null;
   createdAt: string;
+}
+
+interface CurrentUser {
+  userId: string;
+  role: string;
+}
+
+const ROLE_HIERARCHY: Record<string, number> = {
+  owner: 5,
+  admin: 4,
+  manager: 3,
+  tech: 2,
+  client: 1,
+};
+
+function InitialsAvatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const colors = [
+    "bg-blue-600", "bg-emerald-600", "bg-violet-600",
+    "bg-amber-600", "bg-rose-600", "bg-cyan-600", "bg-indigo-600",
+  ];
+  const colorIdx = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length;
+
+  const sizes = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-16 h-16 text-xl" };
+
+  return (
+    <div className={`${sizes[size]} ${colors[colorIdx]} rounded-full flex items-center justify-center text-white font-semibold shrink-0`}>
+      {initials}
+    </div>
+  );
 }
 
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState<TeamMember | null>(null);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [form, setForm] = useState({ name: "", email: "", role: "tech", password: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", role: "", phone: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchMembers = () => {
+  const fetchMembers = useCallback(() => {
     fetch("/api/users")
       .then((r) => r.json())
       .then((data) => {
@@ -26,11 +69,29 @@ export default function TeamPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     fetchMembers();
-  }, []);
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user) setCurrentUser({ userId: data.user.id || data.user.userId, role: data.user.role });
+      })
+      .catch(() => {});
+  }, [fetchMembers]);
+
+  const canManage = currentUser
+    ? ROLE_HIERARCHY[currentUser.role] >= ROLE_HIERARCHY.admin
+    : false;
+
+  const canEditMember = (member: TeamMember) => {
+    if (!currentUser) return false;
+    if (currentUser.userId === member.id) return true;
+    const myRank = ROLE_HIERARCHY[currentUser.role] || 0;
+    const theirRank = ROLE_HIERARCHY[member.role] || 0;
+    return myRank > theirRank;
+  };
 
   const handleInvite = async () => {
     setError("");
@@ -51,43 +112,102 @@ export default function TeamPage() {
       return;
     }
     setForm({ name: "", email: "", role: "tech", password: "" });
-    setShowModal(false);
+    setShowInviteModal(false);
     setSubmitting(false);
     fetchMembers();
   };
 
+  const handleEdit = async () => {
+    if (!editingMember) return;
+    setError("");
+    setSubmitting(true);
+    const res = await fetch(`/api/users/${editingMember.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "Failed to update user");
+      setSubmitting(false);
+      return;
+    }
+    setEditingMember(null);
+    setSubmitting(false);
+    fetchMembers();
+  };
+
+  const handleDelete = async (member: TeamMember) => {
+    if (member.role === "owner") return;
+    if (!confirm(`Delete ${member.name}? This cannot be undone.`)) return;
+    const res = await fetch(`/api/users/${member.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || "Failed to delete user");
+      return;
+    }
+    fetchMembers();
+  };
+
+  const handleTransferOwnership = async (targetId: string) => {
+    if (!confirm("Transfer ownership? You will be demoted to Admin.")) return;
+    const res = await fetch("/api/users/transfer-ownership", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetUserId: targetId }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || "Failed to transfer ownership");
+      return;
+    }
+    window.location.reload();
+  };
+
+  const openEdit = (m: TeamMember) => {
+    setEditForm({ name: m.name, email: m.email, role: m.role, phone: m.phone || "" });
+    setEditingMember(m);
+    setError("");
+  };
+
   const roleLabel = (role: string) => {
     switch (role) {
+      case "owner": return "Owner";
       case "admin": return "Admin";
       case "manager": return "Manager";
       case "tech": return "Technician";
+      case "client": return "Client";
       default: return role;
     }
   };
 
   const roleBadgeColor = (role: string) => {
     switch (role) {
-      case "admin": return "bg-[#c47a4f]/20 text-[#c47a4f]";
+      case "owner": return "bg-[#c47a4f]/20 text-[#c47a4f] border border-[#c47a4f]/30";
+      case "admin": return "bg-[#c47a4f]/15 text-[#c47a4f]";
       case "manager": return "bg-blue-500/20 text-blue-400";
+      case "client": return "bg-emerald-500/20 text-emerald-400";
       default: return "bg-zinc-700/50 text-zinc-400";
     }
   };
 
   return (
-    <div className="p-4 lg:p-8 max-w-4xl mx-auto">
+    <div className="p-4 lg:p-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-syne font-bold text-white">Team</h1>
           <p className="text-sm text-zinc-500 font-mono mt-1">
-            Manage team members and invitations
+            {members.length} member{members.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
-        >
-          Invite Member
-        </button>
+        {canManage && (
+          <button
+            onClick={() => { setShowInviteModal(true); setError(""); }}
+            className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+          >
+            Invite Member
+          </button>
+        )}
       </div>
 
       {/* Team table */}
@@ -96,39 +216,54 @@ export default function TeamPage() {
           <thead>
             <tr className="border-b border-zinc-800">
               <th className="text-left text-xs font-mono text-zinc-500 uppercase tracking-wider px-5 py-3">
-                Name
+                Member
               </th>
-              <th className="text-left text-xs font-mono text-zinc-500 uppercase tracking-wider px-5 py-3">
+              <th className="text-left text-xs font-mono text-zinc-500 uppercase tracking-wider px-5 py-3 hidden sm:table-cell">
                 Email
               </th>
               <th className="text-left text-xs font-mono text-zinc-500 uppercase tracking-wider px-5 py-3">
                 Role
               </th>
-              <th className="text-left text-xs font-mono text-zinc-500 uppercase tracking-wider px-5 py-3">
+              <th className="text-left text-xs font-mono text-zinc-500 uppercase tracking-wider px-5 py-3 hidden md:table-cell">
                 Joined
               </th>
+              {canManage && (
+                <th className="text-right text-xs font-mono text-zinc-500 uppercase tracking-wider px-5 py-3">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-5 py-8 text-center text-sm text-zinc-600">
+                <td colSpan={5} className="px-5 py-8 text-center text-sm text-zinc-600">
                   Loading...
                 </td>
               </tr>
             ) : members.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-5 py-8 text-center text-sm text-zinc-600">
+                <td colSpan={5} className="px-5 py-8 text-center text-sm text-zinc-600">
                   No team members yet.
                 </td>
               </tr>
             ) : (
               members.map((m) => (
                 <tr key={m.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-5 py-3 text-sm text-zinc-200 font-medium">
-                    {m.name}
+                  <td className="px-5 py-3">
+                    <button
+                      onClick={() => setShowProfileModal(m)}
+                      className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                    >
+                      {m.profileImage ? (
+                        <img src={m.profileImage} alt={m.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <InitialsAvatar name={m.name} />
+                      )}
+                      <span className="text-sm text-zinc-200 font-medium">{m.name}</span>
+                    </button>
                   </td>
-                  <td className="px-5 py-3 text-sm text-zinc-400 font-mono">
+                  <td className="px-5 py-3 text-sm text-zinc-400 font-mono hidden sm:table-cell">
                     {m.email}
                   </td>
                   <td className="px-5 py-3">
@@ -136,9 +271,39 @@ export default function TeamPage() {
                       {roleLabel(m.role)}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-sm text-zinc-500 font-mono">
+                  <td className="px-5 py-3 text-sm text-zinc-500 font-mono hidden md:table-cell">
                     {new Date(m.createdAt).toLocaleDateString()}
                   </td>
+                  {canManage && (
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {canEditMember(m) && (
+                          <button
+                            onClick={() => openEdit(m)}
+                            className="text-xs font-mono text-zinc-500 hover:text-[#c47a4f] transition-colors"
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {m.role !== "owner" && canEditMember(m) && (
+                          <button
+                            onClick={() => handleDelete(m)}
+                            className="text-xs font-mono text-zinc-600 hover:text-red-400 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )}
+                        {currentUser?.role === "owner" && m.role !== "owner" && (
+                          <button
+                            onClick={() => handleTransferOwnership(m.id)}
+                            className="text-xs font-mono text-zinc-600 hover:text-amber-400 transition-colors"
+                          >
+                            Transfer
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -147,96 +312,159 @@ export default function TeamPage() {
       </div>
 
       {/* Invite Modal */}
-      {showModal && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/60 z-50"
-            onClick={() => setShowModal(false)}
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-[#0e0e0f] border border-zinc-800 rounded-xl p-6 w-full max-w-md shadow-2xl">
-              <h2 className="text-lg font-syne font-bold text-white mb-4">
-                Invite Team Member
-              </h2>
-
-              {error && (
-                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Full name"
-                    className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="user@company.com"
-                    className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
-                    Role
-                  </label>
-                  <select
-                    value={form.role}
-                    onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="manager">Manager</option>
-                    <option value="tech">Technician</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">
-                    Temporary Password
-                  </label>
-                  <input
-                    type="text"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    placeholder="Temp password for first login"
-                    className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="text-sm font-mono text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleInvite}
-                  disabled={submitting}
-                  className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {submitting ? "Inviting..." : "Send Invite"}
-                </button>
-              </div>
+      {showInviteModal && (
+        <Modal onClose={() => setShowInviteModal(false)} title="Invite Team Member">
+          {error && <ErrorBox message={error} />}
+          <div className="space-y-4">
+            <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Full name" />
+            <Field label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="user@company.com" type="email" />
+            <div>
+              <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Role</label>
+              <select
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
+              >
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="tech">Technician</option>
+                <option value="client">Client</option>
+              </select>
             </div>
+            <Field label="Temporary Password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} placeholder="Temp password for first login" />
           </div>
-        </>
+          <div className="flex justify-end gap-3 mt-6">
+            <button onClick={() => setShowInviteModal(false)} className="text-sm font-mono text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleInvite} disabled={submitting} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors disabled:opacity-50">
+              {submitting ? "Inviting..." : "Send Invite"}
+            </button>
+          </div>
+        </Modal>
       )}
+
+      {/* Edit Modal */}
+      {editingMember && (
+        <Modal onClose={() => setEditingMember(null)} title={`Edit ${editingMember.name}`}>
+          {error && <ErrorBox message={error} />}
+          <div className="space-y-4">
+            <Field label="Name" value={editForm.name} onChange={(v) => setEditForm({ ...editForm, name: v })} />
+            <Field label="Email" value={editForm.email} onChange={(v) => setEditForm({ ...editForm, email: v })} type="email" />
+            <Field label="Phone" value={editForm.phone} onChange={(v) => setEditForm({ ...editForm, phone: v })} type="tel" />
+            {canManage && currentUser?.userId !== editingMember.id && (
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Role</label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="tech">Technician</option>
+                  <option value="client">Client</option>
+                </select>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <button onClick={() => setEditingMember(null)} className="text-sm font-mono text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleEdit} disabled={submitting} className="bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors disabled:opacity-50">
+              {submitting ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <Modal onClose={() => setShowProfileModal(null)} title="Profile">
+          <div className="flex flex-col items-center text-center mb-6">
+            {showProfileModal.profileImage ? (
+              <img src={showProfileModal.profileImage} alt={showProfileModal.name} className="w-16 h-16 rounded-full object-cover mb-3" />
+            ) : (
+              <div className="mb-3">
+                <InitialsAvatar name={showProfileModal.name} size="lg" />
+              </div>
+            )}
+            <h3 className="text-lg font-syne font-bold text-white">{showProfileModal.name}</h3>
+            <span className={`text-xs font-mono px-2 py-1 rounded mt-2 ${roleBadgeColor(showProfileModal.role)}`}>
+              {roleLabel(showProfileModal.role)}
+            </span>
+          </div>
+          <div className="space-y-3 text-sm">
+            <ProfileRow label="Email" value={showProfileModal.email} />
+            <ProfileRow label="Phone" value={showProfileModal.phone || "—"} />
+            <ProfileRow label="Joined" value={new Date(showProfileModal.createdAt).toLocaleDateString()} />
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            {canEditMember(showProfileModal) && (
+              <button
+                onClick={() => {
+                  openEdit(showProfileModal);
+                  setShowProfileModal(null);
+                }}
+                className="text-sm font-mono text-[#c47a4f] hover:text-[#d89a6f] px-4 py-2 rounded-lg border border-[#c47a4f]/30 hover:border-[#c47a4f] transition-colors"
+              >
+                Edit Profile
+              </button>
+            )}
+            <button onClick={() => setShowProfileModal(null)} className="text-sm font-mono text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 transition-colors">
+              Close
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── Shared sub-components ──────────────────────────────────
+function Modal({ onClose, title, children }: { onClose: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-[#0e0e0f] border border-zinc-800 rounded-xl p-6 w-full max-w-md shadow-2xl">
+          <h2 className="text-lg font-syne font-bold text-white mb-4">{title}</h2>
+          {children}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
+  return (
+    <div>
+      <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
+      />
+    </div>
+  );
+}
+
+function ErrorBox({ message }: { message: string }) {
+  return (
+    <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+      {message}
+    </div>
+  );
+}
+
+function ProfileRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-zinc-500 font-mono text-xs uppercase">{label}</span>
+      <span className="text-zinc-300">{value}</span>
     </div>
   );
 }

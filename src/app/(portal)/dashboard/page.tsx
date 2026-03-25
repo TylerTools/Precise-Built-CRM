@@ -125,7 +125,6 @@ export default function DashboardPage() {
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-700/50 transition-colors group"
                 >
                   <span className={`w-2.5 h-2.5 rounded-full ${s.color} shrink-0`} />
-                  <span className="text-sm font-mono text-zinc-600 w-6">{s.key}</span>
                   <span className="text-sm text-zinc-300 flex-1">{s.shortLabel}</span>
                   <span className="text-sm font-mono text-zinc-500 group-hover:text-white transition-colors">
                     {s.count}
@@ -150,7 +149,6 @@ export default function DashboardPage() {
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-700/50 transition-colors group"
                 >
                   <span className={`w-2.5 h-2.5 rounded-full ${s.color} shrink-0`} />
-                  <span className="text-sm font-mono text-zinc-600 w-6">{s.key}</span>
                   <span className="text-sm text-zinc-300 flex-1">{s.shortLabel}</span>
                   <span className="text-sm font-mono text-zinc-500 group-hover:text-white transition-colors">
                     {s.count}
@@ -198,7 +196,7 @@ export default function DashboardPage() {
                           {project.contact.name}
                         </span>
                         <span className="text-[10px] font-mono text-zinc-600">
-                          {stage?.key || project.stage}
+                          {stage?.shortLabel || project.stage}
                         </span>
                       </div>
                       <p className="text-xs text-zinc-500 truncate">

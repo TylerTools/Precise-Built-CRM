@@ -375,7 +375,7 @@ export default function ProjectDetailPage() {
           {currentStage?.label || project.stage}
         </span>
         <span className="text-zinc-600 font-mono text-xs ml-3">
-          Stage {currentStage?.key || project.stage}
+          {currentStage?.division === "SALES" ? "Sales" : "Operations"}
         </span>
         {saving && <span className="text-zinc-600 font-mono text-xs ml-3">Saving...</span>}
       </div>
@@ -391,7 +391,7 @@ export default function ProjectDetailPage() {
             <div
               key={s.key}
               className="flex-1 flex flex-col items-center gap-1"
-              title={`${s.key} — ${s.label}`}
+              title={s.label}
             >
               <div
                 className={`w-full h-2 rounded-full transition-colors ${
@@ -405,9 +405,9 @@ export default function ProjectDetailPage() {
               <span
                 className={`text-[9px] font-mono ${
                   isCurrent ? "text-[#c47a4f] font-bold" : "text-zinc-600"
-                }`}
+                } hidden sm:block truncate text-center w-full`}
               >
-                {s.key}
+                {s.shortLabel}
               </span>
             </div>
           );
@@ -421,7 +421,7 @@ export default function ProjectDetailPage() {
             onClick={revertStage}
             className="text-xs font-mono px-4 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-white transition-colors"
           >
-            &larr; Revert to {prevStageKey}
+            &larr; Revert to {STAGE_MAP[prevStageKey]?.shortLabel}
           </button>
         )}
         {nextStageKey && (
@@ -429,7 +429,7 @@ export default function ProjectDetailPage() {
             onClick={advanceStage}
             className="text-xs font-mono px-4 py-2 rounded-lg bg-[#c47a4f] text-white hover:bg-[#b06a3f] transition-colors"
           >
-            Advance to {nextStageKey} &rarr;
+            Advance to {STAGE_MAP[nextStageKey]?.shortLabel} &rarr;
           </button>
         )}
       </div>

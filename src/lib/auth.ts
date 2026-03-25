@@ -51,7 +51,7 @@ export async function seedAdmin() {
         name: "Tyler",
         email: "tyler@precisebuilt.net",
         passwordHash: "$2b$12$Ni7JgdlXcHyb3Rn7TlmOq.8Q3tTfBMr0sFI2BPe16Iic4/Pr3amKC",
-        role: "admin",
+        role: "owner",
       },
     });
   }
