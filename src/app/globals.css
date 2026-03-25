@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply font-syne text-zinc-100 bg-zinc-900 antialiased;
+    @apply font-syne text-zinc-100 bg-surface antialiased;
   }
 }
 
