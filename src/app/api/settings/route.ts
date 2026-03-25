@@ -21,6 +21,20 @@ export async function GET() {
   return NextResponse.json(settings);
 }
 
+const appearanceFields = [
+  "bgImageUrl",
+  "bgStyle",
+  "bgOverlayOpacity",
+  "bgBlurAmount",
+  "glassOpacity",
+  "glassBlur",
+  "glassBorderOpacity",
+  "hoverAccentGlow",
+  "mainBgColor",
+  "cardColor",
+  "sidebarColor",
+];
+
 export async function PATCH(request: Request) {
   const session = await getSession();
   if (!session || (session.role !== "admin" && session.role !== "owner")) {
@@ -43,7 +57,18 @@ export async function PATCH(request: Request) {
     "stageEmailBody",
     "driveConnected",
     "driveRefreshToken",
+    ...appearanceFields,
   ];
+
+  const hasAppearanceField = appearanceFields.some(
+    (f) => body[f] !== undefined
+  );
+  if (hasAppearanceField && session.role !== "owner") {
+    return NextResponse.json(
+      { error: "Only the owner can modify appearance settings" },
+      { status: 403 }
+    );
+  }
 
   const data: Record<string, unknown> = {};
   for (const key of allowedFields) {
