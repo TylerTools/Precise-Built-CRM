@@ -18,10 +18,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "No email provider configured" }, { status: 500 });
     }
 
+    const recipient = searchParams.get("to") || "tyler@eminence.business";
+
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { data, error } = await resend.emails.send({
       from: "onboarding@resend.dev",
-      to: "tyler@precisebuilt.net",
+      to: recipient,
       subject: "Test Email from Precise Built CRM",
       text: "If you are reading this, email is working.",
     });
