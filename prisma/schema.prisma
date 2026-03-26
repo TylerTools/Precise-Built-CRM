@@ -19,6 +19,8 @@ model User {
   phone        String?
   profileImage String?   @map("profile_image")
   mustChangePassword Boolean @default(false) @map("must_change_password")
+  resetToken         String?   @map("reset_token")
+  resetTokenExpiry   DateTime? @map("reset_token_expiry")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   projects      Project[]   @relation("AssignedUser")

@@ -65,6 +65,7 @@ export default function TeamPage() {
   const [messageUserId, setMessageUserId] = useState<string | null>(null);
   const [resetPassword, setResetPassword] = useState("");
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [resetLinkModal, setResetLinkModal] = useState<string | null>(null);
 
   const fetchMembers = useCallback(() => {
     fetch("/api/users")
@@ -303,6 +304,24 @@ export default function TeamPage() {
                             className="text-xs font-mono text-zinc-500 hover:text-[#c47a4f] transition-colors"
                           >
                             Message
+                          </button>
+                        )}
+                        {canEditMember(m) && m.id !== currentUser?.userId && (
+                          <button
+                            onClick={async () => {
+                              const res = await fetch("/api/auth/forgot-password", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ email: m.email }),
+                              });
+                              const data = await res.json();
+                              if (data.resetUrl) {
+                                setResetLinkModal(data.resetUrl);
+                              }
+                            }}
+                            className="text-xs font-mono text-zinc-500 hover:text-amber-400 transition-colors"
+                          >
+                            Reset PW
                           </button>
                         )}
                         {canEditMember(m) && (
@@ -569,6 +588,34 @@ export default function TeamPage() {
               </button>
             )}
             <button onClick={() => setShowProfileModal(null)} className="text-sm font-mono text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 transition-colors">
+              Close
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Reset Link Modal */}
+      {resetLinkModal && (
+        <Modal onClose={() => setResetLinkModal(null)} title="Password Reset Link">
+          <p className="text-sm text-zinc-400 mb-3">
+            A reset email has been sent (if Resend is configured). You can also share this link directly:
+          </p>
+          <div className="bg-zinc-800 rounded-lg p-3 text-xs font-mono text-zinc-300 break-all select-all">
+            {resetLinkModal}
+          </div>
+          <div className="flex justify-end gap-3 mt-4">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(resetLinkModal);
+              }}
+              className="text-sm font-mono text-[#c47a4f] hover:text-[#d89a6f] px-4 py-2 rounded-lg border border-[#c47a4f]/30 hover:border-[#c47a4f] transition-colors"
+            >
+              Copy Link
+            </button>
+            <button
+              onClick={() => setResetLinkModal(null)}
+              className="text-sm font-mono text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 transition-colors"
+            >
               Close
             </button>
           </div>

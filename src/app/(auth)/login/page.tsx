@@ -14,6 +14,10 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   const oauthError = searchParams.get("error");
   const oauthErrorMessages: Record<string, string> = {
@@ -133,6 +137,15 @@ function LoginForm() {
         >
           {loading ? "Signing in..." : "Sign In"}
         </button>
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => setShowForgot(true)}
+            className="text-zinc-500 hover:text-zinc-300 text-xs font-mono"
+          >
+            Forgot Password?
+          </button>
+        </div>
       </form>
     </div>
   );
