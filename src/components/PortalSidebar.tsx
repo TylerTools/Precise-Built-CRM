@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { SALES_STAGES, OPS_STAGES } from "@/lib/stages";
 import type { StageDefinition } from "@/lib/stages";
 import NewLeadModal from "@/components/NewLeadModal";
+import MessagesDrawer from "@/components/MessagesDrawer";
 
 function StageLink({
   stage,
@@ -43,6 +44,9 @@ export default function PortalSidebar() {
   const [salesOpen, setSalesOpen] = useState(true);
   const [opsOpen, setOpsOpen] = useState(true);
   const [showNewLead, setShowNewLead] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
@@ -58,8 +62,30 @@ export default function PortalSidebar() {
       .then((r) => r.json())
       .then((data) => {
         if (data.user?.role) setUserRole(data.user.role);
+        if (data.user?.id || data.user?.userId) setCurrentUserId(data.user.id || data.user.userId);
       })
       .catch(() => {});
+  }, []);
+
+  // Poll unread message count
+  useEffect(() => {
+    const fetchUnread = () => {
+      fetch("/api/messages")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && !data.error) {
+            let total = 0;
+            for (const key of Object.keys(data)) {
+              total += data[key].unreadCount || 0;
+            }
+            setUnreadCount(total);
+          }
+        })
+        .catch(() => {});
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   if (pathname === "/login") return null;
@@ -177,6 +203,21 @@ export default function PortalSidebar() {
           </svg>
           {!collapsed && <span>New Lead</span>}
         </button>
+        <button
+          onClick={() => setShowMessages(true)}
+          title="Messages"
+          className="relative flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+        >
+          <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          {!collapsed && <span>Messages</span>}
+          {unreadCount > 0 && (
+            <span className={`${collapsed ? "absolute top-1 right-1" : "ml-auto"} w-5 h-5 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold`}>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
       </nav>
 
       {/* Sales section */}
@@ -285,6 +326,20 @@ export default function PortalSidebar() {
         </Link>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowMessages(true)}
+            className="relative p-2 text-zinc-400 hover:text-white transition-colors"
+            title="Messages"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-bold">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setShowNewLead(true)}
             className="flex items-center gap-1.5 bg-[#c47a4f] hover:bg-[#b06a3f] text-white text-xs font-syne font-semibold px-3 py-1.5 rounded-lg transition-colors"
           >
@@ -322,6 +377,11 @@ export default function PortalSidebar() {
         </>
       )}
       <NewLeadModal open={showNewLead} onClose={() => setShowNewLead(false)} />
+      <MessagesDrawer
+        open={showMessages}
+        onClose={() => setShowMessages(false)}
+        currentUserId={currentUserId}
+      />
     </>
   );
 }

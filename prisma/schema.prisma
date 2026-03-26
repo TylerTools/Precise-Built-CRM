@@ -23,6 +23,8 @@ model User {
   projects      Project[]   @relation("AssignedUser")
   timeEntries   TimeEntry[]
   assignedTasks Task[]      @relation("TaskAssignee")
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
 
   @@map("users")
 }
@@ -288,4 +290,20 @@ model FollowUp {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("follow_ups")
+}
+
+// ─── Messages ───────────────────────────────────────────────
+model Message {
+  id         String   @id @default(uuid())
+  fromUserId String   @map("from_user_id")
+  toUserId   String   @map("to_user_id")
+  body       String
+  read       Boolean  @default(false)
+  projectId  String?  @map("project_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  fromUser User @relation("SentMessages", fields: [fromUserId], references: [id])
+  toUser   User @relation("ReceivedMessages", fields: [toUserId], references: [id])
+
+  @@map("messages")
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import MessagesDrawer from "@/components/MessagesDrawer";
 
 interface TeamMember {
   id: string;
@@ -60,6 +61,8 @@ export default function TeamPage() {
   const [editForm, setEditForm] = useState({ name: "", email: "", role: "", phone: "", profileImage: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
+  const [messageUserId, setMessageUserId] = useState<string | null>(null);
 
   const fetchMembers = useCallback(() => {
     fetch("/api/users")
@@ -292,6 +295,14 @@ export default function TeamPage() {
                   {canManage && (
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {currentUser && m.id !== currentUser.userId && (
+                          <button
+                            onClick={() => { setMessageUserId(m.id); setShowMessages(true); }}
+                            className="text-xs font-mono text-zinc-500 hover:text-[#c47a4f] transition-colors"
+                          >
+                            Message
+                          </button>
+                        )}
                         {canEditMember(m) && (
                           <button
                             onClick={() => openEdit(m)}
@@ -442,6 +453,13 @@ export default function TeamPage() {
           </div>
         </Modal>
       )}
+
+      <MessagesDrawer
+        open={showMessages}
+        onClose={() => { setShowMessages(false); setMessageUserId(null); }}
+        currentUserId={currentUser?.userId || ""}
+        preSelectUserId={messageUserId}
+      />
 
       {/* Profile Modal */}
       {showProfileModal && (
