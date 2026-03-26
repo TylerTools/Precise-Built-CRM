@@ -11,9 +11,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  console.log("[Test Email] Provider check:", {
+    RESEND_API_KEY: !!process.env.RESEND_API_KEY,
+    SMTP_HOST: !!process.env.SMTP_HOST,
+    SMTP_HOST_VALUE: process.env.SMTP_HOST || "(not set)",
+    SMTP_PORT: process.env.SMTP_PORT || "(not set)",
+    SMTP_USER: process.env.SMTP_USER ? "(set)" : "(not set)",
+    SMTP_FROM: process.env.SMTP_FROM || "(not set)",
+    provider: process.env.RESEND_API_KEY ? "Resend" : process.env.SMTP_HOST ? "SMTP" : "None",
+  });
+
   if (!process.env.SMTP_HOST) {
-    console.log("[Test Email] SMTP not configured");
-    return NextResponse.json({ error: "SMTP not configured" }, { status: 500 });
+    console.log("[Test Email] No email provider configured — SMTP_HOST missing and no RESEND_API_KEY");
+    return NextResponse.json({ error: "No email provider configured" }, { status: 500 });
   }
 
   const transporter = nodemailer.createTransport({

@@ -1,5 +1,12 @@
 import nodemailer from "nodemailer";
 
+console.log("[Email] Provider check:", {
+  RESEND_API_KEY: !!process.env.RESEND_API_KEY,
+  SMTP_HOST: !!process.env.SMTP_HOST,
+  SMTP_HOST_VALUE: process.env.SMTP_HOST || "(not set)",
+  provider: process.env.RESEND_API_KEY ? "Resend" : process.env.SMTP_HOST ? "SMTP" : "None",
+});
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT) || 587,
