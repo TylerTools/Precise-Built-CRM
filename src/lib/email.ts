@@ -1,20 +1,8 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 console.log("[Email] Provider check:", {
   RESEND_API_KEY: !!process.env.RESEND_API_KEY,
-  SMTP_HOST: !!process.env.SMTP_HOST,
-  SMTP_HOST_VALUE: process.env.SMTP_HOST || "(not set)",
-  provider: process.env.RESEND_API_KEY ? "Resend" : process.env.SMTP_HOST ? "SMTP" : "None",
-});
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
+  provider: process.env.RESEND_API_KEY ? "Resend" : "None",
 });
 
 export async function sendLeadNotification(lead: {
@@ -25,14 +13,15 @@ export async function sendLeadNotification(lead: {
   description: string;
   source: string;
 }) {
-  if (!process.env.SMTP_HOST) {
-    console.log("[Email] SMTP not configured — skipping notification");
+  if (!process.env.RESEND_API_KEY) {
+    console.log("[Email] Resend not configured — skipping notification");
     console.log("[Email] New lead:", lead.name, lead.email);
     return;
   }
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || "noreply@precisebuilt.com",
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const { error } = await resend.emails.send({
+    from: "onboarding@resend.dev",
     to: process.env.NOTIFICATION_EMAIL || "tyler@precisebuilt.net",
     subject: `New Lead: ${lead.name} — ${lead.service}`,
     html: `
@@ -45,4 +34,9 @@ export async function sendLeadNotification(lead: {
       <p><strong>Source:</strong> ${lead.source}</p>
     `,
   });
+
+  if (error) {
+    console.error("[Email] Resend send error:", error);
+    throw error;
+  }
 }
