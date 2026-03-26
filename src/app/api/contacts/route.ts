@@ -4,13 +4,27 @@ import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const search = searchParams.get("search");
+
+  const where = search
+    ? {
+        OR: [
+          { name: { contains: search, mode: "insensitive" as const } },
+          { email: { contains: search, mode: "insensitive" as const } },
+          { phone: { contains: search } },
+        ],
+      }
+    : {};
+
   const contacts = await prisma.contact.findMany({
+    where,
     include: {
       projects: {
         select: {
@@ -23,6 +37,7 @@ export async function GET() {
       },
     },
     orderBy: { createdAt: "desc" },
+    ...(search ? { take: 10 } : {}),
   });
 
   return NextResponse.json(contacts);
