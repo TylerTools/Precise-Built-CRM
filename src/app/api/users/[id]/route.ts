@@ -105,6 +105,29 @@ export async function DELETE(
     return NextResponse.json({ error: "Cannot delete the owner" }, { status: 403 });
   }
 
-  await prisma.user.delete({ where: { id: params.id } });
-  return NextResponse.json({ success: true });
+  try {
+    // Clear foreign key references before deleting user
+    await prisma.task.updateMany({
+      where: { assignedUserId: params.id },
+      data: { assignedUserId: null },
+    });
+    await prisma.project.updateMany({
+      where: { assignedUserId: params.id },
+      data: { assignedUserId: null },
+    });
+    await prisma.message.deleteMany({
+      where: { OR: [{ fromUserId: params.id }, { toUserId: params.id }] },
+    });
+    await prisma.timeEntry.deleteMany({
+      where: { userId: params.id },
+    });
+    await prisma.user.delete({ where: { id: params.id } });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("User delete failed:", err);
+    return NextResponse.json(
+      { error: "Delete failed", details: String(err) },
+      { status: 500 }
+    );
+  }
 }
