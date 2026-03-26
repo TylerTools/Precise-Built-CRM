@@ -56,6 +56,7 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [stageDataMap, setStageDataMap] = useState<Record<string, StageDataRecord>>({});
+  const [stageDataLoaded, setStageDataLoaded] = useState(false);
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
   const [followUps, setFollowUps] = useState<FollowUpRecord[]>([]);
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
@@ -84,8 +85,9 @@ export default function ProjectDetailPage() {
         const map: Record<string, StageDataRecord> = {};
         if (Array.isArray(data)) data.forEach((sd) => (map[sd.stage] = sd));
         setStageDataMap(map);
+        setStageDataLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => { setStageDataLoaded(true); });
   }, [params.id]);
 
   const fetchMeetings = useCallback(() => {
@@ -217,6 +219,7 @@ export default function ProjectDetailPage() {
               expanded
               project={project}
               data={sd(project.stage)}
+              dataLoaded={stageDataLoaded}
               meetings={stageMeetings(project.stage)}
               followUps={followUps}
               saving={saving === project.stage}
@@ -239,6 +242,7 @@ export default function ProjectDetailPage() {
                 expanded={isExpanded}
                 project={project}
                 data={sd(s.key)}
+                dataLoaded={stageDataLoaded}
                 meetings={stageMeetings(s.key)}
                 followUps={s.key === "S4" ? followUps : []}
                 saving={saving === s.key}
@@ -315,6 +319,7 @@ interface StageCardProps {
   expanded: boolean;
   project: Project;
   data: Record<string, unknown>;
+  dataLoaded: boolean;
   meetings: MeetingRecord[];
   followUps: FollowUpRecord[];
   saving: boolean;
@@ -332,6 +337,7 @@ function StageCard({
   expanded,
   project,
   data,
+  dataLoaded,
   meetings,
   followUps,
   saving,
@@ -368,24 +374,33 @@ function StageCard({
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4">
-          {stage.key === "S1" && (
-            <NewLeadStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} />
-          )}
-          {stage.key === "S2" && (
-            <SiteWalkStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} meetings={meetings} onScheduleMeeting={() => onScheduleMeeting("Site Walk - " + project.contact.name)} />
-          )}
-          {stage.key === "S3" && (
-            <EstimateStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} />
-          )}
-          {stage.key === "S4" && (
-            <FollowUpStageCard followUps={followUps} data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} onArchive={onArchive} onSaveFollowUp={onSaveFollowUp} />
-          )}
-          {stage.key === "S5" && (
-            <ProjectHandoffStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} meetings={meetings} onScheduleMeeting={() => onScheduleMeeting("Project Handoff - " + project.contact.name)} />
-          )}
-          {/* Ops stages — generic for now */}
-          {stage.key.startsWith("O") && (
-            <GenericStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} />
+          {!dataLoaded ? (
+            <div className="space-y-3 animate-pulse">
+              <div className="h-8 bg-zinc-800 rounded-lg w-1/3" />
+              <div className="h-10 bg-zinc-800 rounded-lg" />
+              <div className="h-10 bg-zinc-800 rounded-lg w-2/3" />
+            </div>
+          ) : (
+            <>
+              {stage.key === "S1" && (
+                <NewLeadStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} />
+              )}
+              {stage.key === "S2" && (
+                <SiteWalkStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} meetings={meetings} onScheduleMeeting={() => onScheduleMeeting("Site Walk - " + project.contact.name)} />
+              )}
+              {stage.key === "S3" && (
+                <EstimateStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} />
+              )}
+              {stage.key === "S4" && (
+                <FollowUpStageCard followUps={followUps} data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} onArchive={onArchive} onSaveFollowUp={onSaveFollowUp} />
+              )}
+              {stage.key === "S5" && (
+                <ProjectHandoffStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} meetings={meetings} onScheduleMeeting={() => onScheduleMeeting("Project Handoff - " + project.contact.name)} />
+              )}
+              {stage.key.startsWith("O") && (
+                <GenericStageCard data={data} saving={saving} onSave={onSaveData} onAdvance={onAdvance} />
+              )}
+            </>
           )}
         </div>
       )}
@@ -409,6 +424,13 @@ function NewLeadStageCard({
   const [followUpDate, setFollowUpDate] = useState((data.followUpDate as string) || "");
   const [followUpNotes, setFollowUpNotes] = useState((data.followUpNotes as string) || "");
   const [followUpDone, setFollowUpDone] = useState((data.followUpDone as boolean) || false);
+
+  useEffect(() => {
+    setSource((data.source as string) || "");
+    setFollowUpDate((data.followUpDate as string) || "");
+    setFollowUpNotes((data.followUpNotes as string) || "");
+    setFollowUpDone((data.followUpDone as boolean) || false);
+  }, [data]);
 
   return (
     <>
@@ -474,6 +496,10 @@ function SiteWalkStageCard({
 }) {
   const [notes, setNotes] = useState((data.notes as string) || "");
 
+  useEffect(() => {
+    setNotes((data.notes as string) || "");
+  }, [data]);
+
   return (
     <>
       <div className="flex items-center gap-3">
@@ -532,6 +558,12 @@ function EstimateStageCard({
   const [amount, setAmount] = useState((data.amount as string) || "");
   const [dateSent, setDateSent] = useState((data.dateSent as string) || "");
   const [notes, setNotes] = useState((data.notes as string) || "");
+
+  useEffect(() => {
+    setAmount((data.amount as string) || "");
+    setDateSent((data.dateSent as string) || "");
+    setNotes((data.notes as string) || "");
+  }, [data]);
 
   return (
     <>
@@ -608,6 +640,10 @@ function FollowUpStageCard({
       );
     }
   }, [followUps]);
+
+  useEffect(() => {
+    setCloseNote((data.closeNote as string) || "");
+  }, [data]);
 
   const addAttempt = () => {
     if (attempts.length < 3) {
@@ -696,6 +732,13 @@ function ProjectHandoffStageCard({
   const [depositAmount, setDepositAmount] = useState((data.depositAmount as string) || "");
   const [notes, setNotes] = useState((data.notes as string) || "");
 
+  useEffect(() => {
+    setContractSigned((data.contractSigned as boolean) || false);
+    setDepositReceived((data.depositReceived as boolean) || false);
+    setDepositAmount((data.depositAmount as string) || "");
+    setNotes((data.notes as string) || "");
+  }, [data]);
+
   return (
     <>
       <div className="flex items-center gap-3">
@@ -767,6 +810,10 @@ function GenericStageCard({
   onAdvance?: () => void;
 }) {
   const [notes, setNotes] = useState((data.notes as string) || "");
+
+  useEffect(() => {
+    setNotes((data.notes as string) || "");
+  }, [data]);
 
   return (
     <>
