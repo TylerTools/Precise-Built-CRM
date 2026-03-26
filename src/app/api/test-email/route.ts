@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const secret = searchParams.get("secret");
 
-  if (secret !== process.env.JWT_SECRET) {
+  if (secret !== process.env.JWT_SECRET && secret !== process.env.SEED_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
