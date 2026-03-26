@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { getSession, hashPassword, verifyPassword } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +22,8 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  const { name, email, role, phone, profileImage, displayName } = body;
+  const { name, email, role, phone, profileImage, displayName, currentPassword, newPassword, tempPassword } = body;
 
-  // Users can edit their own profile (name, email, phone, profileImage, displayName)
   const isSelf = session.userId === params.id;
   const sessionRank = ROLE_HIERARCHY[session.role] || 0;
 
@@ -57,12 +56,45 @@ export async function PATCH(
   }
 
   const data: Record<string, unknown> = {};
+  // Forced password change (mustChangePassword flow — no current password needed)
+  if (body.forceNewPassword && isSelf) {
+    const user = await prisma.user.findUnique({ where: { id: params.id } });
+    if (user?.mustChangePassword) {
+      data.passwordHash = await hashPassword(body.forceNewPassword);
+      data.mustChangePassword = false;
+    }
+  }
+
+  if (body.mustChangePassword !== undefined && sessionRank >= ROLE_HIERARCHY.admin) {
+    data.mustChangePassword = body.mustChangePassword;
+  }
+
   if (name !== undefined) data.name = name;
   if (email !== undefined) data.email = email;
   if (phone !== undefined) data.phone = phone;
   if (profileImage !== undefined) data.profileImage = profileImage;
   if (displayName !== undefined) data.displayName = displayName;
   if (role !== undefined && !isSelf) data.role = role;
+
+  // Self password change: verify current password first
+  if (currentPassword && newPassword && isSelf) {
+    const user = await prisma.user.findUnique({ where: { id: params.id } });
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+    const valid = await verifyPassword(currentPassword, user.passwordHash);
+    if (!valid) {
+      return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
+    }
+    data.passwordHash = await hashPassword(newPassword);
+    data.mustChangePassword = false;
+  }
+
+  // Admin reset: set temp password and flag
+  if (tempPassword && !isSelf && sessionRank >= ROLE_HIERARCHY.admin) {
+    data.passwordHash = await hashPassword(tempPassword);
+    data.mustChangePassword = true;
+  }
 
   const user = await prisma.user.update({
     where: { id: params.id },
@@ -75,6 +107,7 @@ export async function PATCH(
       phone: true,
       profileImage: true,
       displayName: true,
+      mustChangePassword: true,
       createdAt: true,
     },
   });
@@ -106,7 +139,6 @@ export async function DELETE(
   }
 
   try {
-    // Clear foreign key references before deleting user
     await prisma.task.updateMany({
       where: { assignedUserId: params.id },
       data: { assignedUserId: null },

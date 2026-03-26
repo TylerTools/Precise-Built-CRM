@@ -18,6 +18,7 @@ model User {
   displayName  String?   @map("display_name")
   phone        String?
   profileImage String?   @map("profile_image")
+  mustChangePassword Boolean @default(false) @map("must_change_password")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   projects      Project[]   @relation("AssignedUser")

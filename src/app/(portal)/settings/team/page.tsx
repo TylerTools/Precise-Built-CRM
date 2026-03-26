@@ -63,6 +63,8 @@ export default function TeamPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [messageUserId, setMessageUserId] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   const fetchMembers = useCallback(() => {
     fetch("/api/users")
@@ -443,6 +445,57 @@ export default function TeamPage() {
               </div>
             )}
           </div>
+          {/* Reset Password */}
+          {canManage && currentUser?.userId !== editingMember.id && (
+            <div className="border-t border-zinc-800 pt-4 mt-4">
+              <p className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-2">Reset Password</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="New temporary password"
+                  className="flex-1 bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-[#c47a4f]"
+                />
+                <button
+                  onClick={async () => {
+                    if (!resetPassword || !editingMember) return;
+                    setSubmitting(true);
+                    const res = await fetch(`/api/users/${editingMember.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ tempPassword: resetPassword }),
+                    });
+                    if (res.ok) {
+                      // Send in-app notification
+                      await fetch("/api/messages", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          toUserId: editingMember.id,
+                          body: "Your password has been reset by an admin. Please log in with your new temporary password and change it.",
+                        }),
+                      });
+                      setResetPassword("");
+                      setResetSuccess(true);
+                      setTimeout(() => setResetSuccess(false), 3000);
+                    } else {
+                      const data = await res.json();
+                      setError(data.error || "Failed to reset password");
+                    }
+                    setSubmitting(false);
+                  }}
+                  disabled={submitting || !resetPassword}
+                  className="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-mono px-3 py-2 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                >
+                  Reset
+                </button>
+              </div>
+              {resetSuccess && (
+                <p className="text-xs text-emerald-400 font-mono mt-1">Password reset. User notified via message.</p>
+              )}
+            </div>
+          )}
           <div className="flex justify-end gap-3 mt-6">
             <button onClick={() => setEditingMember(null)} className="text-sm font-mono text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 transition-colors">
               Cancel

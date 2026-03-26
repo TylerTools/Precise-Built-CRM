@@ -8,6 +8,7 @@ import { SALES_STAGES, OPS_STAGES } from "@/lib/stages";
 import type { StageDefinition } from "@/lib/stages";
 import NewLeadModal from "@/components/NewLeadModal";
 import MessagesDrawer from "@/components/MessagesDrawer";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 function StageLink({
   stage,
@@ -47,6 +48,11 @@ export default function PortalSidebar() {
   const [showMessages, setShowMessages] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState("");
+  const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [userProfileImage, setUserProfileImage] = useState("");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
@@ -63,6 +69,10 @@ export default function PortalSidebar() {
       .then((data) => {
         if (data.user?.role) setUserRole(data.user.role);
         if (data.user?.id || data.user?.userId) setCurrentUserId(data.user.id || data.user.userId);
+        if (data.user?.name) setUserName(data.user.name);
+        if (data.user?.email) setUserEmail(data.user.email);
+        if (data.user?.profileImage) setUserProfileImage(data.user.profileImage);
+        if (data.user?.mustChangePassword) window.location.href = "/change-password";
       })
       .catch(() => {});
   }, []);
@@ -292,14 +302,43 @@ export default function PortalSidebar() {
 
         <div className="border-t border-zinc-800/50 my-2" />
 
-        <button
-          onClick={handleLogout}
-          title="Sign Out"
-          className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg text-sm text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
-        >
-          <LogoutIcon />
-          {!collapsed && <span>Sign Out</span>}
-        </button>
+        {/* Profile section */}
+        <div className="relative">
+          <button
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            title={userName || "Profile"}
+            className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center text-[10px] text-white font-semibold shrink-0 overflow-hidden">
+              {userProfileImage ? (
+                <img src={userProfileImage} alt="" className="w-full h-full object-cover" />
+              ) : (
+                (userName || "?").slice(0, 2).toUpperCase()
+              )}
+            </div>
+            {!collapsed && <span className="truncate">{userName || "Profile"}</span>}
+          </button>
+          {showProfileMenu && (
+            <div className="absolute bottom-full left-0 right-0 mb-1 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl overflow-hidden z-50">
+              <div className="px-3 py-2 border-b border-zinc-800">
+                <p className="text-sm text-zinc-200 font-medium truncate">{userName}</p>
+                <p className="text-[10px] text-zinc-500 font-mono truncate">{userEmail}</p>
+              </div>
+              <button
+                onClick={() => { setShowChangePassword(true); setShowProfileMenu(false); }}
+                className="w-full text-left px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                Change Password
+              </button>
+              <button
+                onClick={() => { handleLogout(); setShowProfileMenu(false); }}
+                className="w-full text-left px-3 py-2 text-sm text-zinc-500 hover:text-red-400 hover:bg-white/5 transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -381,6 +420,11 @@ export default function PortalSidebar() {
         open={showMessages}
         onClose={() => setShowMessages(false)}
         currentUserId={currentUserId}
+      />
+      <ChangePasswordModal
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        userId={currentUserId}
       />
     </>
   );
