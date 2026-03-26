@@ -40,3 +40,38 @@ export async function sendLeadNotification(lead: {
     throw error;
   }
 }
+
+export async function sendInviteEmail(invite: {
+  to: string;
+  name: string;
+  email: string;
+  password: string;
+  loginUrl: string;
+}) {
+  if (!process.env.RESEND_API_KEY) {
+    console.log("[Email] Resend not configured — skipping invite email");
+    console.log("[Email] Invite:", invite.name, invite.email);
+    return;
+  }
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const { error } = await resend.emails.send({
+    from: "onboarding@resend.dev",
+    to: invite.to,
+    subject: "You've been invited to Precise Built Field OS",
+    html: `
+      <h2>Welcome to Precise Built Field OS</h2>
+      <p>Hi ${invite.name},</p>
+      <p>Your account has been created. Here are your login details:</p>
+      <p><strong>Email:</strong> ${invite.email}</p>
+      <p><strong>Temporary Password:</strong> ${invite.password}</p>
+      <p><a href="${invite.loginUrl}">Login here</a></p>
+      <p>Please change your password after your first login.</p>
+    `,
+  });
+
+  if (error) {
+    console.error("[Email] Invite email error:", error);
+    throw error;
+  }
+}

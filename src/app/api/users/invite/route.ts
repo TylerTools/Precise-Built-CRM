@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession, hashPassword } from "@/lib/auth";
+import { sendInviteEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,18 @@ export async function POST(request: Request) {
     select: { id: true, name: true, email: true, role: true, createdAt: true },
   });
 
-  // TODO: Send welcome email with temp password via email service
+  // Send welcome email with temp password
+  try {
+    await sendInviteEmail({
+      to: email,
+      name,
+      email,
+      password,
+      loginUrl: (process.env.NEXT_PUBLIC_APP_URL || "https://precise-built-crm.vercel.app") + "/login",
+    });
+  } catch (err) {
+    console.error("Invite email failed:", err);
+  }
 
   return NextResponse.json(user, { status: 201 });
 }
